@@ -1,0 +1,17 @@
+# Environment / secrets
+.env
+*.env.local
+
+# Build artifacts
+/specter
+/bin/
+dist/
+
+# Coverage
+coverage.out
+*.out
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
