@@ -1,0 +1,16 @@
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS music_queue;
+DROP TABLE IF EXISTS access_control;
+DROP TABLE IF EXISTS modlog_overrides;
+DROP TABLE IF EXISTS afk_users;
+DROP TABLE IF EXISTS jtc_channels;
+DROP TABLE IF EXISTS jtc_config;
+DROP TABLE IF EXISTS reaction_role_entries;
+DROP TABLE IF EXISTS reaction_role_menus;
+DROP TABLE IF EXISTS automod_config;
+DROP TABLE IF EXISTS mod_actions;
+DROP TABLE IF EXISTS warnings;
+DROP TABLE IF EXISTS level_config;
+DROP TABLE IF EXISTS levels;
+DROP TABLE IF EXISTS guilds;
