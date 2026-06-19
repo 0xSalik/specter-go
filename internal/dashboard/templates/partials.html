@@ -1,0 +1,37 @@
+{{define "head"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · Specter</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+<header class="border-b border-zinc-800 bg-zinc-900/60">
+  <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="/dashboard" class="text-lg font-semibold tracking-tight">Specter</a>
+    <div class="text-sm text-zinc-400">
+      {{if .Username}}<span class="mr-3">{{.Username}}</span><a class="text-indigo-400 hover:underline" href="/logout">Log out</a>{{end}}
+    </div>
+  </div>
+</header>
+<main class="max-w-5xl mx-auto px-6 py-8">{{end}}
+
+{{define "guildnav"}}
+<nav class="mb-8 flex flex-wrap gap-2 text-sm">
+  {{$g := .GuildID}}
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}">Overview</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/levels">Levels</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/automod">Automod</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/modlogs">Mod Logs</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/reactionroles">Reaction Roles</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/music">Music</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/access">Access</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/rapsheets">Rapsheets</a>
+  <a class="px-3 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700" href="/dashboard/{{$g}}/audit">Audit</a>
+</nav>{{end}}
+
+{{define "foot"}}</main>
+<footer class="max-w-5xl mx-auto px-6 py-8 text-xs text-zinc-600">Specter administration dashboard</footer>
+</body></html>{{end}}

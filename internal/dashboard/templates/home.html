@@ -1,0 +1,20 @@
+{{template "head" .}}
+<h1 class="text-2xl font-semibold mb-6">Your Servers</h1>
+<div class="grid gap-3 sm:grid-cols-2">
+  {{range .Data.Guilds}}
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-4 flex items-center justify-between">
+      <div>
+        <div class="font-medium">{{.Name}}</div>
+        <div class="text-xs text-zinc-500">{{.ID}}</div>
+      </div>
+      {{if .HasBot}}
+        <a href="/dashboard/{{.ID}}" class="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-sm">Manage</a>
+      {{else}}
+        <span class="px-3 py-1.5 rounded-md bg-zinc-800 text-zinc-500 text-sm">Not added</span>
+      {{end}}
+    </div>
+  {{else}}
+    <p class="text-zinc-400">No manageable servers found.</p>
+  {{end}}
+</div>
+{{template "foot" .}}
