@@ -1,0 +1,38 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-6">Level Settings</h1>
+{{with .Data.Config}}
+{{$sel := deref .AnnounceChannelID}}
+<form method="post" class="space-y-5 max-w-lg">
+  <label class="flex items-center gap-2">
+    <input type="checkbox" name="enabled" {{if .Enabled}}checked{{end}} class="rounded">
+    <span>Enable leveling</span>
+  </label>
+  <div class="grid grid-cols-3 gap-3">
+    <div><label class="block text-xs text-zinc-400 mb-1">XP Min</label><input class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1" type="number" name="xp_min" value="{{.XPMin}}"></div>
+    <div><label class="block text-xs text-zinc-400 mb-1">XP Max</label><input class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1" type="number" name="xp_max" value="{{.XPMax}}"></div>
+    <div><label class="block text-xs text-zinc-400 mb-1">Cooldown (s)</label><input class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1" type="number" name="cooldown" value="{{.XPCooldownSecs}}"></div>
+  </div>
+  <div>
+    <label class="block text-xs text-zinc-400 mb-1">Announce Channel</label>
+    <select name="announce_channel" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+      <option value="">Same channel as message</option>
+      {{range $.Data.Channels}}<option value="{{.ID}}" {{if eq .ID $sel}}selected{{end}}>#{{.Name}}</option>{{end}}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-zinc-400 mb-1">Level-up message ({user}, {level})</label>
+    <input class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1" name="announce_msg" value="{{deref .AnnounceMsg}}">
+  </div>
+  <div>
+    <label class="block text-xs text-zinc-400 mb-1">No-XP Roles (comma separated IDs)</label>
+    <input class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1" name="no_xp_roles" value="{{join .NoXPRoles}}">
+  </div>
+  <div>
+    <label class="block text-xs text-zinc-400 mb-1">No-XP Channels (comma separated IDs)</label>
+    <input class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1" name="no_xp_channels" value="{{join .NoXPChannels}}">
+  </div>
+  <button class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">Save</button>
+</form>
+{{end}}
+{{template "foot" .}}
