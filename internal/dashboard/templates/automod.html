@@ -1,0 +1,38 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-6">Automod Settings</h1>
+{{with .Data.Config}}
+<form method="post" class="space-y-5 max-w-lg">
+  <label class="flex items-center gap-2"><input type="checkbox" name="enabled" {{if .Enabled}}checked{{end}}><span>Master switch</span></label>
+  <div class="space-y-2 border-t border-zinc-800 pt-4">
+    <label class="flex items-center gap-2"><input type="checkbox" name="anti_spam" {{if .AntiSpamEnabled}}checked{{end}}><span>Anti-spam</span></label>
+    <div class="grid grid-cols-2 gap-3 pl-6">
+      <div><label class="block text-xs text-zinc-400">Threshold</label><input type="number" name="spam_threshold" value="{{.AntiSpamThreshold}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+      <div><label class="block text-xs text-zinc-400">Window (s)</label><input type="number" name="spam_window" value="{{.AntiSpamWindowSecs}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+    </div>
+    <label class="flex items-center gap-2"><input type="checkbox" name="anti_invite" {{if .AntiInviteEnabled}}checked{{end}}><span>Anti-invite</span></label>
+    <label class="flex items-center gap-2"><input type="checkbox" name="anti_link" {{if .AntiLinkEnabled}}checked{{end}}><span>Anti-link</span></label>
+    <div class="pl-6"><label class="block text-xs text-zinc-400">Allowed domains (comma separated)</label><input name="allowed_domains" value="{{join .AllowedLinkDomains}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+    <label class="flex items-center gap-2"><input type="checkbox" name="anti_caps" {{if .AntiCapsEnabled}}checked{{end}}><span>Anti-caps</span></label>
+    <div class="pl-6"><label class="block text-xs text-zinc-400">Caps threshold %</label><input type="number" name="caps_threshold" value="{{.CapsThresholdPct}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+    <label class="flex items-center gap-2"><input type="checkbox" name="bad_words_enabled" {{if .BadWordsEnabled}}checked{{end}}><span>Bad words filter</span></label>
+    <div class="pl-6"><label class="block text-xs text-zinc-400">Bad words (one per line)</label><textarea name="bad_words" rows="4" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">{{$.Data.BadWords}}</textarea></div>
+  </div>
+  <div class="border-t border-zinc-800 pt-4 space-y-3">
+    <div><label class="block text-xs text-zinc-400">Exempt roles (comma separated IDs)</label><input name="exempt_roles" value="{{join .ExemptRoles}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+    <div><label class="block text-xs text-zinc-400">Exempt channels (comma separated IDs)</label><input name="exempt_channels" value="{{join .ExemptChannels}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+    <div><label class="block text-xs text-zinc-400">Action</label>
+      {{$a := .Action}}
+      <select name="action" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+        <option value="delete" {{if eq $a "delete"}}selected{{end}}>delete</option>
+        <option value="warn" {{if eq $a "warn"}}selected{{end}}>warn</option>
+        <option value="timeout" {{if eq $a "timeout"}}selected{{end}}>timeout</option>
+        <option value="kick" {{if eq $a "kick"}}selected{{end}}>kick</option>
+        <option value="ban" {{if eq $a "ban"}}selected{{end}}>ban</option>
+      </select>
+    </div>
+  </div>
+  <button class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">Save</button>
+</form>
+{{end}}
+{{template "foot" .}}
