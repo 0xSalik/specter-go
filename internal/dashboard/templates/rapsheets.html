@@ -1,0 +1,31 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-6">Rapsheets</h1>
+<form method="get" class="flex gap-2 mb-6 max-w-md">
+  <input name="user_id" value="{{.Data.UserID}}" placeholder="User ID" class="flex-1 bg-zinc-900 border border-zinc-700 rounded px-3 py-1.5">
+  <button class="px-4 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500">Search</button>
+</form>
+
+{{if .Data.UserID}}
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="font-medium">History for {{.Data.UserID}}</h2>
+    <form method="post" action="/dashboard/{{.GuildID}}/rapsheets/clear" onsubmit="return confirm('Clear all actions and warnings for this user?')">
+      <input type="hidden" name="user_id" value="{{.Data.UserID}}">
+      <button class="px-3 py-1.5 rounded-md bg-red-600 hover:bg-red-500 text-sm">Clear Rapsheet</button>
+    </form>
+  </div>
+  <table class="w-full text-sm">
+    <thead><tr class="text-left text-zinc-400"><th class="py-2">ID</th><th>Action</th><th>Moderator</th><th>Reason</th><th>Date</th></tr></thead>
+    <tbody>
+    {{range .Data.Actions}}
+      <tr class="border-t border-zinc-800">
+        <td class="py-2">#{{.ID}}</td><td>{{.Action}}</td><td class="font-mono text-xs">{{.ModID}}</td>
+        <td>{{deref .Reason}}</td><td class="text-zinc-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="5" class="py-3 text-zinc-500">No actions found.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+{{end}}
+{{template "foot" .}}
