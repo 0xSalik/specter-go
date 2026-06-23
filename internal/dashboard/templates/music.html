@@ -1,0 +1,20 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-6">Music</h1>
+<div class="flex items-center justify-between mb-3">
+  <h2 class="font-medium">Persisted Queue</h2>
+  <form method="post" action="/dashboard/{{.GuildID}}/music/clear">
+    <button class="px-3 py-1.5 rounded-md bg-red-600 hover:bg-red-500 text-sm">Clear Queue</button>
+  </form>
+</div>
+<table class="w-full text-sm">
+  <thead><tr class="text-left text-zinc-400"><th class="py-2">#</th><th>Title</th><th>Requester</th></tr></thead>
+  <tbody>
+  {{range .Data.Queue}}
+    <tr class="border-t border-zinc-800"><td class="py-2">{{.Position}}</td><td>{{.Title}}</td><td class="font-mono text-xs">{{.Requester}}</td></tr>
+  {{else}}
+    <tr><td colspan="3" class="py-3 text-zinc-500">Queue is empty.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{template "foot" .}}

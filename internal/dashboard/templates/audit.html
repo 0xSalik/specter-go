@@ -1,0 +1,23 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-6">Audit Log</h1>
+<table class="w-full text-sm">
+  <thead><tr class="text-left text-zinc-400"><th class="py-2">When</th><th>Actor</th><th>Action</th><th>Target</th></tr></thead>
+  <tbody>
+  {{range .Data.Entries}}
+    <tr class="border-t border-zinc-800">
+      <td class="py-2 text-zinc-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+      <td class="font-mono text-xs">{{.ActorID}}</td>
+      <td>{{.Action}}</td>
+      <td class="font-mono text-xs">{{deref .Target}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4" class="py-3 text-zinc-500">No audit entries.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+<div class="flex gap-2 mt-4 text-sm">
+  {{if gt .Data.Page 0}}<a class="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700" href="?page={{.Data.PrevPage}}">Previous</a>{{end}}
+  {{if .Data.HasNext}}<a class="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700" href="?page={{.Data.NextPage}}">Next</a>{{end}}
+</div>
+{{template "foot" .}}
