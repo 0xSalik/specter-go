@@ -1,0 +1,34 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: specter
+          POSTGRES_PASSWORD: specter
+          POSTGRES_DB: specter_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: Verify build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Run unit and integration tests
+        env:
+          TEST_DATABASE_URL: postgres://specter:specter@localhost:5432/specter_test?sslmode=disable
+        run: go test -race -count=1 ./tests/unit/... ./tests/integration/...
+      - name: Check for data races in build
+        run: go build -race ./...
