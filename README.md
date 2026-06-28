@@ -1,6 +1,6 @@
 # Specter
 
-Specter is a professional-grade Discord administration and utility bot written in Go. It is slash-command only, every response is a Discord embed, and the embed accent color is configurable per server. A built-in web dashboard (Discord OAuth2 + HTMX + Tailwind) provides full configuration without leaving the browser.
+Specter is a professional-grade Discord administration and utility bot written in Go with a built-in web dashboard (Discord OAuth2 + HTMX + Tailwind) that provides full configuration without leaving the browser.
 
 ## Features
 
