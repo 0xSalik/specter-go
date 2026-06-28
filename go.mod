@@ -4,6 +4,8 @@ go 1.26.4
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
+	github.com/disgoorg/disgolink/v4 v4.0.0-20260522172606-c51182f6e828
+	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/fogleman/gg v1.3.0
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/jackc/pgx/v5 v5.10.0
@@ -14,8 +16,9 @@ require (
 )
 
 require (
-	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/disgoorg/json/v2 v2.0.0 // indirect
+	github.com/disgoorg/omit v1.0.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
@@ -41,5 +44,3 @@ require (
 	golang.org/x/text v0.38.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/bwmarrin/discordgo => /Users/salik/discordgo-dave

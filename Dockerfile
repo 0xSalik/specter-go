@@ -21,7 +21,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 FROM alpine:3.19
 
 # ca-certificates: HTTPS to Discord/external APIs.
-# ffmpeg + python3 + yt-dlp: music and media downloads.
+# ffmpeg + python3 + yt-dlp: /tiktok and /ytdownload media commands (music is
+# handled by the separate Lavalink node, not this image).
 # ttf-dejavu: fonts for rank-card and tweet image generation.
 RUN apk add --no-cache \
         ca-certificates \

@@ -3,9 +3,9 @@ package music
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/0xSalik/specter/internal/core"
-	musicsvc "github.com/0xSalik/specter/internal/music"
 )
 
 func handleQueue(c *core.Context) {
@@ -14,12 +14,12 @@ func handleQueue(c *core.Context) {
 		_ = c.Errorf("Nothing is currently playing.", nil)
 		return
 	}
-	current, _ := p.Current()
-	tracks := p.Queue().List()
+	current, _, playing := p.Current()
+	tracks := p.QueueList()
 
 	b := c.Embed().Title("Queue").Timestamp()
-	if current.Title != "" {
-		b.Field("Now Playing", fmt.Sprintf("**%s** • <@%s>", current.Title, current.Requester), false)
+	if playing {
+		b.Field("Now Playing", fmt.Sprintf("%s • <@%s>", trackLink(current), current.Requester), false)
 	}
 	if len(tracks) == 0 {
 		b.Description("The queue is empty.")
@@ -30,7 +30,7 @@ func handleQueue(c *core.Context) {
 			limit = 10
 		}
 		for i := 0; i < limit; i++ {
-			fmt.Fprintf(&sb, "**%d.** %s\n", i+1, tracks[i].Title)
+			fmt.Fprintf(&sb, "**%d.** %s • <@%s>\n", i+1, trackLink(tracks[i]), tracks[i].Requester)
 		}
 		if len(tracks) > 10 {
 			fmt.Fprintf(&sb, "…and %d more", len(tracks)-10)
@@ -46,23 +46,28 @@ func handleNowPlaying(c *core.Context) {
 		_ = c.Errorf("Nothing is currently playing.", nil)
 		return
 	}
-	current, elapsed := p.Current()
-	if current.Title == "" {
+	current, position, playing := p.Current()
+	if !playing {
 		_ = c.Errorf("Nothing is currently playing.", nil)
 		return
 	}
 
-	b := c.Embed().Title("Now Playing").Description(fmt.Sprintf("**%s**", current.Title)).
+	b := c.Embed().Title("Now Playing").Description(trackLink(current)).
 		Field("Requested by", fmt.Sprintf("<@%s>", current.Requester), true).
 		Field("State", p.State().String(), true).Timestamp()
 
-	if current.Duration > 0 {
-		b.Field("Progress", progressBar(elapsed, current.Duration), false)
+	if current.Author() != "" {
+		b.Field("Author", current.Author(), true)
+	}
+	if current.IsStream() {
+		b.Field("Progress", "🔴 Live stream", false)
+	} else if d := current.Duration(); d > 0 {
+		b.Field("Progress", progressBar(position, d), false)
 	}
 	_ = c.Reply(b.Build())
 }
 
-func progressBar(elapsed, total int) string {
+func progressBar(elapsed, total time.Duration) string {
 	if total <= 0 {
 		return ""
 	}
@@ -70,9 +75,10 @@ func progressBar(elapsed, total int) string {
 		elapsed = total
 	}
 	const slots = 20
-	filled := elapsed * slots / total
+	filled := int(elapsed * slots / total)
+	if filled > slots {
+		filled = slots
+	}
 	bar := strings.Repeat("█", filled) + strings.Repeat("─", slots-filled)
-	return fmt.Sprintf("`%s`\n%s / %s", bar, formatSeconds(elapsed), formatSeconds(total))
+	return fmt.Sprintf("`%s`\n%s / %s", bar, formatDuration(elapsed), formatDuration(total))
 }
-
-var _ = musicsvc.StateIdle

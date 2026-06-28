@@ -1,0 +1,85 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+
+lavalink:
+  # Plugins are downloaded automatically on first start into ./plugins.
+  plugins:
+    # YouTube + YouTube Music (replaces Lavalink's deprecated built-in source).
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.1"
+      snapshot: false
+    # Spotify / Apple Music / Deezer metadata resolution (streams via YouTube).
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.8.3"
+      snapshot: false
+  server:
+    password: "${LAVALINK_SERVER_PASSWORD:youshallnotpass}"
+    sources:
+      youtube: false # handled by the youtube-source plugin below
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      nico: true
+      http: true
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    playerUpdateInterval: 5
+    youtubePlaylistLoadLimit: 6
+    youtubeSearchEnabled: true
+    soundcloudSearchEnabled: true
+
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true # enables "ytsearch:" and "ytmsearch:"
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    # Queried in order; this set is the current recommendation for reliability.
+    clients:
+      - MUSIC
+      - ANDROID_VR
+      - WEB
+      - WEBEMBEDDED
+  lavasrc:
+    sources:
+      spotify: true # Spotify (resolved/streamed via the youtube provider below)
+      applemusic: false
+      deezer: false
+      yandexmusic: false
+      flowerytts: false
+      youtube: true # let LavaSrc hand Spotify tracks to YouTube for playback
+    spotify:
+      # These come from the SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET env vars
+      # passed to the container. Leave unset to disable Spotify (other sources
+      # keep working).
+      clientId: "${SPOTIFY_CLIENT_ID:}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET:}"
+      countryCode: "US"
+      playlistLoadLimit: 6
+      albumLoadLimit: 6
+    providers:
+      - "ytsearch:\"%ISRC%\"" # most accurate: match by recording ID
+      - "ytsearch:%QUERY%"
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
+  request:
+    enabled: false

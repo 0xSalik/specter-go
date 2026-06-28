@@ -69,7 +69,11 @@ func New(cfg *config.Config, store *queries.Store) (*Bot, error) {
 		Gate:          access.NewGate(store),
 		Modlog:        modlog.New(store),
 		MessageCache:  modlog.NewMessageCache(),
-		Music:         music.NewManager(session, cfg.YTDLPPath, "ffmpeg", "dca"),
+		Music: music.NewManager(session, music.NodeConfig{
+			Address:  cfg.LavalinkAddress,
+			Password: cfg.LavalinkPassword,
+			Secure:   cfg.LavalinkSecure,
+		}),
 		Levels:        levels.NewEngine(store),
 		Automod:       automod.NewChecker(),
 		ReactionRoles: reactionroles.New(store),
@@ -123,6 +127,11 @@ func (b *Bot) Open() error {
 	}
 	log.Info().Int("count", len(defs)).Msgf("registered slash commands %s", scope)
 
+	// Connect to the Lavalink audio node. Failures are non-fatal: the bot keeps
+	// running (music commands report the backend is unavailable) and we retry
+	// with backoff so the node can come up slightly after the bot.
+	go b.connectLavalink(appID)
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -136,6 +145,27 @@ func (b *Bot) Open() error {
 	}()
 
 	return nil
+}
+
+// connectLavalink attempts to connect to the Lavalink node, retrying with a
+// capped backoff so a node that starts shortly after the bot still gets picked
+// up. It gives up after a number of attempts to avoid spinning forever.
+func (b *Bot) connectLavalink(botUserID string) {
+	delay := 3 * time.Second
+	for attempt := 1; attempt <= 10; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		err := b.deps.Music.Start(ctx, botUserID)
+		cancel()
+		if err == nil {
+			return
+		}
+		log.Warn().Err(err).Int("attempt", attempt).Msgf("Lavalink not reachable, retrying in %s", delay)
+		time.Sleep(delay)
+		if delay < 30*time.Second {
+			delay *= 2
+		}
+	}
+	log.Error().Msg("giving up connecting to Lavalink; music commands will remain unavailable until restart")
 }
 
 // Close gracefully shuts down all subsystems.

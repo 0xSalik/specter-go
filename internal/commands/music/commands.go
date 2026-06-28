@@ -1,5 +1,5 @@
-// Package music implements the playback slash commands backed by the
-// per-guild player manager.
+// Package music implements the playback slash commands backed by the Lavalink
+// player manager.
 package music
 
 import (
@@ -20,7 +20,7 @@ const group = "music"
 // Register wires all music commands into the router.
 func Register(r *core.Router) {
 	r.Register(core.Command{Group: group, Handler: handlePlay, Def: &discordgo.ApplicationCommand{
-		Name: "play", Description: "Play a track or add it to the queue",
+		Name: "play", Description: "Play a track from YouTube, YouTube Music, Spotify, or SoundCloud",
 		Options: []*discordgo.ApplicationCommandOption{
 			{Type: discordgo.ApplicationCommandOptionString, Name: "query", Description: "Search term or URL", Required: true},
 		},
@@ -58,16 +58,16 @@ func userVoiceChannel(c *core.Context) (string, error) {
 }
 
 func handlePlay(c *core.Context) {
-	query := c.StringOpt("query", "")
-	if strings.TrimSpace(query) == "" {
+	query := strings.TrimSpace(c.StringOpt("query", ""))
+	if query == "" {
 		_ = c.Errorf("You must provide a search term or URL.", nil)
 		return
 	}
 
 	_ = c.Defer(false)
 
-	if !c.Music.Resolver().Available() {
-		_ = c.Errorf("Music is unavailable: yt-dlp is not installed on the host. Install it from https://github.com/yt-dlp/yt-dlp.", nil)
+	if !c.Music.Ready() {
+		_ = c.Errorf("Music is currently unavailable: the Lavalink audio server is not connected. Make sure it's running and try again.", nil)
 		return
 	}
 
@@ -77,39 +77,63 @@ func handlePlay(c *core.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	track, err := c.Music.Resolver().Resolve(ctx, query)
+	result, err := c.Music.Load(ctx, query)
 	if err != nil {
-		_ = c.Errorf("Could not resolve that track: "+err.Error(), err)
+		if errors.Is(err, musicsvc.ErrNoMatches) {
+			_ = c.Errorf("No results found for that query.", nil)
+			return
+		}
+		_ = c.Errorf("Could not load that track: "+err.Error(), err)
 		return
 	}
-	track.Requester = c.UserID
 
-	player, err := c.Music.Play(c.GuildID, vcID, *track)
+	started, position, err := c.Music.Play(ctx, c.GuildID, vcID, c.UserID, result.Tracks)
 	if err != nil {
 		_ = c.Errorf("Failed to join the voice channel or start playback.", err)
 		return
 	}
 
-	position := player.Queue().Len()
 	b := c.Embed().Timestamp()
-	if position == 0 && player.State() == musicsvc.StatePlaying {
-		b.Title("Now Playing").Description(fmt.Sprintf("**%s**", track.Title))
-	} else {
-		b.Title("Added to Queue").Description(fmt.Sprintf("**%s**", track.Title)).
-			Field("Position", fmt.Sprintf("#%d", position), true)
-	}
-	if track.Duration > 0 {
-		b.Field("Duration", formatSeconds(track.Duration), true)
+	switch {
+	case result.Playlist != "":
+		b.Title("Added Playlist to Queue").
+			Description(fmt.Sprintf("**%s**", result.Playlist)).
+			Field("Tracks", fmt.Sprintf("%d", len(result.Tracks)), true)
+		if !started {
+			b.Field("Starting At", fmt.Sprintf("#%d", position), true)
+		}
+	default:
+		track := musicsvc.Track{Track: result.Tracks[0]}
+		if started {
+			b.Title("Now Playing").Description(trackLink(track))
+		} else {
+			b.Title("Added to Queue").Description(trackLink(track)).
+				Field("Position", fmt.Sprintf("#%d", position), true)
+		}
+		if d := track.Duration(); d > 0 {
+			b.Field("Duration", formatDuration(d), true)
+		}
 	}
 	_ = c.Reply(b.Build())
 }
 
 func handlePause(c *core.Context) {
 	p, ok := c.Music.Get(c.GuildID)
-	if !ok || !p.Pause() {
+	if !ok {
+		_ = c.Errorf("Nothing is currently playing.", nil)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	paused, err := p.Pause(ctx)
+	if err != nil {
+		_ = c.Errorf("Failed to pause playback.", err)
+		return
+	}
+	if !paused {
 		_ = c.Errorf("Nothing is currently playing.", nil)
 		return
 	}
@@ -118,7 +142,18 @@ func handlePause(c *core.Context) {
 
 func handleResume(c *core.Context) {
 	p, ok := c.Music.Get(c.GuildID)
-	if !ok || !p.Resume() {
+	if !ok {
+		_ = c.Errorf("Playback is not paused.", nil)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resumed, err := p.Resume(ctx)
+	if err != nil {
+		_ = c.Errorf("Failed to resume playback.", err)
+		return
+	}
+	if !resumed {
 		_ = c.Errorf("Playback is not paused.", nil)
 		return
 	}
@@ -131,12 +166,22 @@ func handleSkip(c *core.Context) {
 		_ = c.Errorf("Nothing is currently playing.", nil)
 		return
 	}
-	p.Skip()
-	if p.Queue().Len() == 0 {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	next, err := p.Skip(ctx)
+	if err != nil {
+		if errors.Is(err, musicsvc.ErrNoVoice) {
+			_ = c.Errorf("Nothing is currently playing.", nil)
+			return
+		}
+		_ = c.Errorf("Failed to skip the track.", err)
+		return
+	}
+	if next == nil {
 		_ = c.Success("Skipped", "Skipped the current track. The queue is now empty.")
 		return
 	}
-	_ = c.Success("Skipped", "Skipped to the next track.")
+	_ = c.Success("Skipped", fmt.Sprintf("Now playing %s.", trackLink(*next)))
 }
 
 func handleStop(c *core.Context) {
@@ -145,7 +190,12 @@ func handleStop(c *core.Context) {
 		_ = c.Errorf("Nothing is currently playing.", nil)
 		return
 	}
-	p.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := p.Stop(ctx); err != nil {
+		_ = c.Errorf("Failed to stop playback.", err)
+		return
+	}
 	_ = c.Success("Stopped", "Playback stopped and the queue cleared.")
 }
 
@@ -164,14 +214,26 @@ func handleVolume(c *core.Context) {
 		_ = c.Errorf("Nothing is currently playing.", nil)
 		return
 	}
-	p.SetVolume(level)
-	_ = c.Success("Volume Set", fmt.Sprintf("Volume set to **%d%%**. It applies to the next track.", level))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := p.SetVolume(ctx, level); err != nil {
+		_ = c.Errorf("Failed to set the volume.", err)
+		return
+	}
+	_ = c.Success("Volume Set", fmt.Sprintf("Volume set to **%d%%**.", level))
 }
 
 func ptrFloat(f float64) *float64 { return &f }
 
-func formatSeconds(s int) string {
-	d := time.Duration(s) * time.Second
+// trackLink renders a track as a markdown link to its source, or bold title.
+func trackLink(t musicsvc.Track) string {
+	if url := t.URL(); url != "" {
+		return fmt.Sprintf("[%s](%s)", t.Title(), url)
+	}
+	return fmt.Sprintf("**%s**", t.Title())
+}
+
+func formatDuration(d time.Duration) string {
 	h := int(d.Hours())
 	m := int(d.Minutes()) % 60
 	sec := int(d.Seconds()) % 60

@@ -1,74 +1,50 @@
-// Package music implements the per-guild audio player: a thread-safe queue, a
-// yt-dlp resolver, an ffmpeg+dca encoding pipeline, and a player state machine.
+// Package music drives audio playback through a Lavalink node via the disgolink
+// client. Specter does not decode or stream audio itself: the Lavalink server
+// owns the Discord voice connection (including the DAVE E2EE handshake) and the
+// source plugins (youtube-source, LavaSrc for Spotify, built-in SoundCloud).
+// This package only forwards Discord voice gateway events to Lavalink, resolves
+// queries, and maintains the per-guild queue and now-playing metadata.
 package music
 
-import "sync"
+import (
+	"time"
 
-// Track is a single queued item.
+	"github.com/disgoorg/disgolink/v4/lavalink"
+)
+
+// Track is a single queued item: a resolved Lavalink track plus the ID of the
+// user who requested it.
 type Track struct {
-	Title     string
-	URL       string // resolvable input (page URL or search term result)
-	Requester string // user ID
-	Duration  int    // seconds, 0 if unknown
+	lavalink.Track
+	Requester string
 }
 
-// Queue is a FIFO queue safe for concurrent use.
-type Queue struct {
-	mu    sync.Mutex
-	items []Track
-}
-
-// NewQueue constructs an empty queue.
-func NewQueue() *Queue { return &Queue{} }
-
-// Enqueue appends a track.
-func (q *Queue) Enqueue(t Track) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.items = append(q.items, t)
-}
-
-// Dequeue removes and returns the front track. ok is false when empty.
-func (q *Queue) Dequeue() (Track, bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if len(q.items) == 0 {
-		return Track{}, false
+// Title returns the track title, falling back to the identifier.
+func (t Track) Title() string {
+	if t.Info.Title != "" {
+		return t.Info.Title
 	}
-	t := q.items[0]
-	q.items = q.items[1:]
-	return t, true
+	return t.Info.Identifier
 }
 
-// Peek returns the front track without removing it.
-func (q *Queue) Peek() (Track, bool) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if len(q.items) == 0 {
-		return Track{}, false
+// Author returns the track author/uploader.
+func (t Track) Author() string { return t.Info.Author }
+
+// URL returns the track's source URL if present.
+func (t Track) URL() string {
+	if t.Info.URI != nil {
+		return *t.Info.URI
 	}
-	return q.items[0], true
+	return ""
 }
 
-// Len returns the number of queued tracks.
-func (q *Queue) Len() int {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	return len(q.items)
+// Duration returns the track length. Streams report zero.
+func (t Track) Duration() time.Duration {
+	if t.Info.IsStream {
+		return 0
+	}
+	return time.Duration(t.Info.Length) * time.Millisecond
 }
 
-// List returns a copy of the queued tracks.
-func (q *Queue) List() []Track {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	out := make([]Track, len(q.items))
-	copy(out, q.items)
-	return out
-}
-
-// Clear empties the queue atomically.
-func (q *Queue) Clear() {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.items = nil
-}
+// IsStream reports whether the track is a live stream of unknown length.
+func (t Track) IsStream() bool { return t.Info.IsStream }

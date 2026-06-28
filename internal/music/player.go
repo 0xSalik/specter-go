@@ -2,12 +2,10 @@ package music
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
-	"github.com/rs/zerolog/log"
+	"github.com/disgoorg/disgolink/v4/disgolink"
 )
 
 // State enumerates the player lifecycle states.
@@ -17,7 +15,6 @@ const (
 	StateIdle State = iota
 	StatePlaying
 	StatePaused
-	StateStopped
 )
 
 func (s State) String() string {
@@ -26,233 +23,171 @@ func (s State) String() string {
 		return "Playing"
 	case StatePaused:
 		return "Paused"
-	case StateStopped:
-		return "Stopped"
 	default:
 		return "Idle"
 	}
 }
 
-// Player owns the playback loop and voice connection for a single guild.
-type Player struct {
+// GuildPlayer holds the queue and now-playing metadata for one guild. Actual
+// playback is performed by the Lavalink node; this type tracks what we asked it
+// to play and translates commands into Lavalink player updates.
+type GuildPlayer struct {
 	guildID string
 	mgr     *Manager
 
-	mu        sync.Mutex
-	state     State
-	queue     *Queue
-	vc        *discordgo.VoiceConnection
-	current   Track
-	volume    int
-	startedAt time.Time
-	running   bool
-
-	skipCh  chan struct{}
-	stopCh  chan struct{}
-	pauseCh chan bool
+	mu      sync.Mutex
+	queue   []Track
+	current *Track
+	vcID    string
+	volume  int
 }
 
-func newPlayer(guildID string, mgr *Manager) *Player {
-	return &Player{
-		guildID: guildID,
-		mgr:     mgr,
-		queue:   NewQueue(),
-		volume:  256,
-		state:   StateIdle,
-		skipCh:  make(chan struct{}, 1),
-		stopCh:  make(chan struct{}, 1),
-		pauseCh: make(chan bool, 1),
+func newGuildPlayer(guildID string, mgr *Manager) *GuildPlayer {
+	return &GuildPlayer{guildID: guildID, mgr: mgr, volume: 100}
+}
+
+// Current returns the currently playing track and the live playback position.
+// ok is false when nothing is playing.
+func (gp *GuildPlayer) Current() (track Track, position time.Duration, ok bool) {
+	gp.mu.Lock()
+	cur := gp.current
+	gp.mu.Unlock()
+	if cur == nil {
+		return Track{}, 0, false
 	}
-}
-
-// State returns the current player state.
-func (p *Player) State() State {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.state
-}
-
-// Queue exposes the underlying queue.
-func (p *Player) Queue() *Queue { return p.queue }
-
-// Current returns the currently playing track and elapsed seconds.
-func (p *Player) Current() (Track, int) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	elapsed := 0
-	if !p.startedAt.IsZero() && p.state == StatePlaying {
-		elapsed = int(time.Since(p.startedAt).Seconds())
+	var pos time.Duration
+	if p, ready := gp.mgr.lavaPlayer(gp.guildID); ready {
+		pos = time.Duration(p.Position()) * time.Millisecond
 	}
-	return p.current, elapsed
+	return *cur, pos, true
 }
 
-// Volume returns the configured volume (0..256 scale, displayed as 1..100).
-func (p *Player) Volume() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.volume
+// State reports whether the player is idle, playing, or paused.
+func (gp *GuildPlayer) State() State {
+	gp.mu.Lock()
+	cur := gp.current
+	gp.mu.Unlock()
+	if cur == nil {
+		return StateIdle
+	}
+	if p, ok := gp.mgr.lavaPlayer(gp.guildID); ok && p.Paused {
+		return StatePaused
+	}
+	return StatePlaying
 }
 
-// SetVolume sets the playback volume. percent is 1..100.
-func (p *Player) SetVolume(percent int) {
+// QueueList returns a copy of the pending tracks (excluding the current track).
+func (gp *GuildPlayer) QueueList() []Track {
+	gp.mu.Lock()
+	defer gp.mu.Unlock()
+	out := make([]Track, len(gp.queue))
+	copy(out, gp.queue)
+	return out
+}
+
+// QueueLen returns the number of pending tracks.
+func (gp *GuildPlayer) QueueLen() int {
+	gp.mu.Lock()
+	defer gp.mu.Unlock()
+	return len(gp.queue)
+}
+
+// Volume returns the configured volume (1..100, Lavalink scale).
+func (gp *GuildPlayer) Volume() int {
+	gp.mu.Lock()
+	defer gp.mu.Unlock()
+	return gp.volume
+}
+
+// Pause pauses playback. Returns false if nothing is playing.
+func (gp *GuildPlayer) Pause(ctx context.Context) (bool, error) {
+	gp.mu.Lock()
+	cur := gp.current
+	gp.mu.Unlock()
+	if cur == nil {
+		return false, nil
+	}
+	p, ok := gp.mgr.lavaPlayer(gp.guildID)
+	if !ok {
+		return false, ErrNotReady
+	}
+	if p.Paused {
+		return false, nil
+	}
+	return true, p.Update(ctx, disgolink.WithPaused(true))
+}
+
+// Resume resumes playback. Returns false if it was not paused.
+func (gp *GuildPlayer) Resume(ctx context.Context) (bool, error) {
+	gp.mu.Lock()
+	cur := gp.current
+	gp.mu.Unlock()
+	if cur == nil {
+		return false, nil
+	}
+	p, ok := gp.mgr.lavaPlayer(gp.guildID)
+	if !ok {
+		return false, ErrNotReady
+	}
+	if !p.Paused {
+		return false, nil
+	}
+	return true, p.Update(ctx, disgolink.WithPaused(false))
+}
+
+// Skip stops the current track and starts the next queued track, if any. It
+// returns the track that started playing, or nil when the queue is now empty.
+func (gp *GuildPlayer) Skip(ctx context.Context) (*Track, error) {
+	p, ok := gp.mgr.lavaPlayer(gp.guildID)
+	if !ok {
+		return nil, ErrNotReady
+	}
+	gp.mu.Lock()
+	if gp.current == nil {
+		gp.mu.Unlock()
+		return nil, ErrNoVoice
+	}
+	if len(gp.queue) == 0 {
+		gp.current = nil
+		gp.mu.Unlock()
+		return nil, p.Update(ctx, disgolink.WithNullTrack())
+	}
+	next := gp.queue[0]
+	gp.queue = gp.queue[1:]
+	gp.current = &next
+	gp.mu.Unlock()
+	// Replacing the track ends the previous one with reason "replaced", which
+	// does not trigger auto-advance, so we drive the transition explicitly here.
+	return &next, p.Update(ctx, disgolink.WithTrack(next.Track))
+}
+
+// Stop clears the queue and stops playback without leaving the channel.
+func (gp *GuildPlayer) Stop(ctx context.Context) error {
+	p, ok := gp.mgr.lavaPlayer(gp.guildID)
+	if !ok {
+		return ErrNotReady
+	}
+	gp.mu.Lock()
+	gp.queue = nil
+	gp.current = nil
+	gp.mu.Unlock()
+	return p.Update(ctx, disgolink.WithNullTrack())
+}
+
+// SetVolume sets playback volume (1..100), applied immediately.
+func (gp *GuildPlayer) SetVolume(ctx context.Context, percent int) error {
 	if percent < 1 {
 		percent = 1
 	}
 	if percent > 100 {
 		percent = 100
 	}
-	p.mu.Lock()
-	p.volume = percent * 256 / 100
-	p.mu.Unlock()
+	gp.mu.Lock()
+	gp.volume = percent
+	gp.mu.Unlock()
+	p, ok := gp.mgr.lavaPlayer(gp.guildID)
+	if !ok {
+		return ErrNotReady
+	}
+	return p.Update(ctx, disgolink.WithVolume(percent))
 }
-
-// Pause requests playback to pause.
-func (p *Player) Pause() bool {
-	p.mu.Lock()
-	if p.state != StatePlaying {
-		p.mu.Unlock()
-		return false
-	}
-	p.state = StatePaused
-	p.mu.Unlock()
-	select {
-	case p.pauseCh <- true:
-	default:
-	}
-	return true
-}
-
-// Resume requests playback to resume.
-func (p *Player) Resume() bool {
-	p.mu.Lock()
-	if p.state != StatePaused {
-		p.mu.Unlock()
-		return false
-	}
-	p.state = StatePlaying
-	p.mu.Unlock()
-	select {
-	case p.pauseCh <- false:
-	default:
-	}
-	return true
-}
-
-// Skip skips the current track.
-func (p *Player) Skip() {
-	select {
-	case p.skipCh <- struct{}{}:
-	default:
-	}
-}
-
-// Stop stops playback and clears the queue.
-func (p *Player) Stop() {
-	p.queue.Clear()
-	select {
-	case p.stopCh <- struct{}{}:
-	default:
-	}
-}
-
-// runLoop drains the queue, encoding and streaming each track until exhausted,
-// stopped, or the voice connection is lost. It owns transitions back to Idle.
-func (p *Player) runLoop() {
-	defer func() {
-		p.mu.Lock()
-		p.running = false
-		p.state = StateIdle
-		p.current = Track{}
-		p.mu.Unlock()
-	}()
-
-	for {
-		select {
-		case <-p.stopCh:
-			return
-		default:
-		}
-
-		track, ok := p.queue.Dequeue()
-		if !ok {
-			return // queue exhausted
-		}
-
-		p.mu.Lock()
-		p.current = track
-		p.state = StatePlaying
-		p.startedAt = time.Now()
-		vc := p.vc
-		vol := p.volume
-		p.mu.Unlock()
-
-		if vc == nil {
-			return
-		}
-
-		if stopped := p.playTrack(vc, track, vol); stopped {
-			return
-		}
-	}
-}
-
-// playTrack streams a single track. It returns true if the player was stopped
-// (queue cleared / leave) and the loop should terminate.
-func (p *Player) playTrack(vc *discordgo.VoiceConnection, track Track, vol int) (stopped bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	stream, err := EncodeStream(ctx, p.mgr.ffmpeg, p.mgr.dca, track.URL, vol)
-	if err != nil {
-		log.Error().Err(err).Str("guild", p.guildID).Str("track", track.Title).Msg("music: encode failed")
-		return false // skip to next track
-	}
-	defer stream.Stop()
-
-	_ = vc.Speaking(true)
-	defer vc.Speaking(false) //nolint:errcheck
-
-	for {
-		select {
-		case <-p.stopCh:
-			return true
-		case <-p.skipCh:
-			return false
-		case paused := <-p.pauseCh:
-			if paused {
-				if stop := p.waitResume(); stop {
-					return true
-				}
-			}
-		case frame, ok := <-stream.Frames:
-			if !ok {
-				return false // track finished
-			}
-			select {
-			case vc.OpusSend <- frame:
-			case <-time.After(2 * time.Second):
-				return false // voice connection stalled; move on
-			case <-p.stopCh:
-				return true
-			}
-		}
-	}
-}
-
-// waitResume blocks while paused. Returns true if stopped while paused.
-func (p *Player) waitResume() bool {
-	for {
-		select {
-		case <-p.stopCh:
-			return true
-		case <-p.skipCh:
-			return false
-		case paused := <-p.pauseCh:
-			if !paused {
-				return false
-			}
-		}
-	}
-}
-
-var errNoVoice = errors.New("not connected to a voice channel")

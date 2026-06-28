@@ -17,11 +17,16 @@ type Config struct {
 	DatabaseURL           string
 	DashboardPort         int
 	DashboardSessionKey   string
-	YTDLPPath             string
+	YTDLPPath             string // used by the media-download commands (not music)
 	LogLevel              string
 	Environment           string
 	DevGuildID            string // optional: register commands to this guild for instant updates
 	GuildJoinLogChannelID string // optional: channel where bot server joins/leaves are logged
+
+	// Lavalink (music backend).
+	LavalinkAddress  string // host:port of the Lavalink node
+	LavalinkPassword string
+	LavalinkSecure   bool // true for wss/https
 }
 
 // Load reads configuration from the environment and an optional .env file.
@@ -43,6 +48,9 @@ func Load() (*Config, error) {
 	v.SetDefault("YTDLP_PATH", "yt-dlp")
 	v.SetDefault("LOG_LEVEL", "info")
 	v.SetDefault("ENVIRONMENT", "production")
+	v.SetDefault("LAVALINK_ADDRESS", "localhost:2333")
+	v.SetDefault("LAVALINK_PASSWORD", "youshallnotpass")
+	v.SetDefault("LAVALINK_SECURE", false)
 
 	cfg := &Config{
 		DiscordToken:          v.GetString("DISCORD_TOKEN"),
@@ -57,6 +65,9 @@ func Load() (*Config, error) {
 		Environment:           v.GetString("ENVIRONMENT"),
 		DevGuildID:            v.GetString("DEV_GUILD_ID"),
 		GuildJoinLogChannelID: v.GetString("GUILD_JOIN_LOG_CHANNEL_ID"),
+		LavalinkAddress:       v.GetString("LAVALINK_ADDRESS"),
+		LavalinkPassword:      v.GetString("LAVALINK_PASSWORD"),
+		LavalinkSecure:        v.GetBool("LAVALINK_SECURE"),
 	}
 
 	if err := cfg.validate(); err != nil {
