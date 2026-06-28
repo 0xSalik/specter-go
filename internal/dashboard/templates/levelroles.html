@@ -1,0 +1,41 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-1">Level Rewards</h1>
+<p class="text-zinc-500 text-sm mb-6">Grant roles automatically when members reach a level.</p>
+
+<form method="post" class="mb-6 flex items-center gap-3">
+  <input type="hidden" name="op" value="stack">
+  <label class="flex items-center gap-2"><input type="checkbox" name="stack_rewards" {{if .Data.Config.StackRewards}}checked{{end}}><span>Keep lower reward roles when leveling up (stack)</span></label>
+  <button class="px-3 py-1.5 rounded-md bg-zinc-700 hover:bg-zinc-600 text-sm">Save mode</button>
+</form>
+
+<form method="post" class="mb-8 flex flex-wrap items-end gap-3 border-t border-zinc-800 pt-4">
+  <input type="hidden" name="op" value="add">
+  <div><label class="block text-xs text-zinc-400">Level</label><input type="number" name="level" min="1" value="5" class="w-24 bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+  <div><label class="block text-xs text-zinc-400">Role</label>
+    <select name="role_id" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+      {{range .Data.Roles}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+    </select>
+  </div>
+  <button class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">Add reward</button>
+</form>
+
+<table class="w-full text-sm">
+  <thead><tr class="text-left text-zinc-500"><th class="py-2">Level</th><th>Role</th><th></th></tr></thead>
+  <tbody>
+  {{range .Data.Rewards}}
+    <tr class="border-t border-zinc-800">
+      <td class="py-2">Level {{.Level}}</td>
+      <td>{{$rid := .RoleID}}{{$name := printf "%s" $rid}}{{range $.Data.Roles}}{{if eq .ID $rid}}{{$name = .Name}}{{end}}{{end}}{{$name}}</td>
+      <td class="text-right">
+        <form method="post"><input type="hidden" name="op" value="delete"><input type="hidden" name="level" value="{{.Level}}">
+          <button class="px-2 py-1 rounded bg-red-900/60 hover:bg-red-800 text-xs">Remove</button>
+        </form>
+      </td>
+    </tr>
+  {{else}}
+    <tr><td colspan="3" class="py-3 text-zinc-500">No level rewards configured.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{template "foot" .}}

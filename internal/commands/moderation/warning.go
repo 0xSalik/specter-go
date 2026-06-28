@@ -40,6 +40,9 @@ func warnAdd(c *core.Context) {
 		return
 	}
 
+	dmNotify(c, user.ID, "warn", "You have received a warning",
+		fmt.Sprintf("You were warned in **%s**.", guildName(c)), reason)
+
 	recordAndLog(c, modlog.EventWarn, "warn", user.ID, user.Username, reason, nil)
 	_ = c.Reply(c.Embed().Title("Warning Issued").
 		Description(fmt.Sprintf("**%s** has been warned.", user.Username)).

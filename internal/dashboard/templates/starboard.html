@@ -1,0 +1,24 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-1">Starboard</h1>
+<p class="text-zinc-500 text-sm mb-6">Repost messages that reach the star threshold into a highlight channel.</p>
+{{with .Data.Config}}
+<form method="post" class="space-y-5 max-w-lg">
+  <label class="flex items-center gap-2"><input type="checkbox" name="enabled" {{if .Enabled}}checked{{end}}><span>Enable starboard</span></label>
+  <div>
+    <label class="block text-xs text-zinc-400">Channel</label>
+    {{$sel := deref .ChannelID}}
+    <select name="channel" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+      <option value="">(none)</option>
+      {{range $.Data.Channels}}<option value="{{.ID}}" {{if eq .ID $sel}}selected{{end}}>#{{.Name}}</option>{{end}}
+    </select>
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div><label class="block text-xs text-zinc-400">Emoji</label><input name="emoji" value="{{.Emoji}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+    <div><label class="block text-xs text-zinc-400">Threshold (stars)</label><input type="number" name="threshold" min="1" value="{{.Threshold}}" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1"></div>
+  </div>
+  <label class="flex items-center gap-2"><input type="checkbox" name="self_star" {{if .SelfStar}}checked{{end}}><span>Allow members to star their own messages</span></label>
+  <button class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">Save</button>
+</form>
+{{end}}
+{{template "foot" .}}

@@ -55,6 +55,35 @@ func tryDM(c *core.Context, userID string, e *discordgo.MessageEmbed) {
 	_, _ = c.Session.ChannelMessageSendEmbed(ch.ID, e)
 }
 
+// dmNotify DMs a member about a moderation action, but only when the guild has
+// DM notifications enabled for that action type. The configured appeal message
+// (if any) is appended. action is one of "warn","timeout","kick","ban".
+func dmNotify(c *core.Context, userID, action, title, body, reason string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ms, err := c.Store.GetModSettings(ctx, c.GuildID)
+	if err != nil {
+		return
+	}
+	enabled := map[string]bool{
+		"warn": ms.DMOnWarn, "timeout": ms.DMOnTimeout,
+		"kick": ms.DMOnKick, "ban": ms.DMOnBan,
+	}[action]
+	if !enabled {
+		return
+	}
+
+	b := c.Embed().Title(title).Description(body).AsError()
+	if reason != "" {
+		b.Field("Reason", reason, false)
+	}
+	if ms.AppealMessage != nil && *ms.AppealMessage != "" {
+		b.Field("Appeal", *ms.AppealMessage, false)
+	}
+	tryDM(c, userID, b.Build())
+}
+
 // guildName returns the guild's name for use in DM notifications.
 func guildName(c *core.Context) string {
 	if g, err := c.Session.State.Guild(c.GuildID); err == nil && g != nil {

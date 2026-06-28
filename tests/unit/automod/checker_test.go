@@ -83,3 +83,42 @@ func TestEvaluateExemptRole(t *testing.T) {
 	v := c.Evaluate(cfg, "g:u:c", "discord.gg/abc", []string{"vip"}, "c")
 	assert.Nil(t, v)
 }
+
+func TestRuleAppliesToRoles(t *testing.T) {
+	// No scope: applies to everyone.
+	assert.True(t, automod.RuleAppliesToRoles(queries.RuleScope{}, []string{"a"}))
+
+	// Exclude: members with the role are never caught.
+	exclude := queries.RuleScope{Exclude: []string{"mod"}}
+	assert.False(t, automod.RuleAppliesToRoles(exclude, []string{"mod"}))
+	assert.True(t, automod.RuleAppliesToRoles(exclude, []string{"member"}))
+
+	// Include: only members with one of the roles are caught.
+	include := queries.RuleScope{Include: []string{"new"}}
+	assert.True(t, automod.RuleAppliesToRoles(include, []string{"new"}))
+	assert.False(t, automod.RuleAppliesToRoles(include, []string{"trusted"}))
+
+	// Exclude takes precedence over include.
+	both := queries.RuleScope{Include: []string{"new"}, Exclude: []string{"vip"}}
+	assert.False(t, automod.RuleAppliesToRoles(both, []string{"new", "vip"}))
+}
+
+func TestEvaluatePerRuleScope(t *testing.T) {
+	c := automod.NewChecker()
+	defer c.Close()
+	cfg := queries.DefaultAutomodConfig("g")
+	cfg.Enabled = true
+	cfg.AntiInviteEnabled = true
+	cfg.RuleRoleScopes = map[string]queries.RuleScope{
+		"invite": {Exclude: []string{"trusted"}},
+	}
+
+	// Trusted member bypasses only the invite rule.
+	assert.Nil(t, c.Evaluate(cfg, "g:u1:c", "discord.gg/abc", []string{"trusted"}, "c"))
+
+	// A regular member is still caught.
+	v := c.Evaluate(cfg, "g:u2:c", "discord.gg/abc", []string{"member"}, "c")
+	if assert.NotNil(t, v) {
+		assert.Equal(t, "invite", v.Rule)
+	}
+}

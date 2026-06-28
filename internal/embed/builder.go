@@ -155,6 +155,14 @@ func (e *EmbedBuilder) Image(url string) *EmbedBuilder {
 	return e
 }
 
+// Author sets the embed author line (name plus optional icon URL).
+func (e *EmbedBuilder) Author(name, iconURL string) *EmbedBuilder {
+	if name != "" {
+		e.embed.Author = &discordgo.MessageEmbedAuthor{Name: name, IconURL: iconURL}
+	}
+	return e
+}
+
 // Color overrides the accent color with an explicit int value.
 func (e *EmbedBuilder) Color(c int) *EmbedBuilder { e.embed.Color = c; return e }
 

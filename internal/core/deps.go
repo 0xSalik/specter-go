@@ -15,6 +15,7 @@ import (
 	"github.com/0xSalik/specter/internal/modlog"
 	"github.com/0xSalik/specter/internal/music"
 	"github.com/0xSalik/specter/internal/reactionroles"
+	"github.com/0xSalik/specter/internal/starboard"
 	"github.com/0xSalik/specter/internal/voice"
 )
 
@@ -32,5 +33,6 @@ type Deps struct {
 	ReactionRoles *reactionroles.Handler
 	JTC           *voice.Manager
 	Invites       *invites.Tracker
+	Starboard     *starboard.Handler
 	Config        *config.Config
 }

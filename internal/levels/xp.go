@@ -141,6 +141,66 @@ func (e *Engine) HandleMessage(s *discordgo.Session, m *discordgo.MessageCreate)
 
 	if entry.Level > prevLevel {
 		e.announce(s, m, cfg, entry.Level)
+		var roles []string
+		if m.Member != nil {
+			roles = m.Member.Roles
+		}
+		e.applyLevelRewards(ctx, s, m.GuildID, m.Author.ID, roles, entry.Level, cfg.StackRewards)
+	}
+}
+
+// applyLevelRewards grants role rewards a member has earned at their new level.
+// When stacking is disabled, only the single highest earned reward is kept and
+// lower reward roles are removed.
+func (e *Engine) applyLevelRewards(ctx context.Context, s *discordgo.Session, guildID, userID string, currentRoles []string, level int, stack bool) {
+	rewards, err := e.store.ListLevelRewards(ctx, guildID)
+	if err != nil || len(rewards) == 0 {
+		return
+	}
+
+	held := make(map[string]struct{}, len(currentRoles))
+	for _, r := range currentRoles {
+		held[r] = struct{}{}
+	}
+
+	// rewards are ordered ascending by level; find earned ones.
+	var earned []queries.LevelReward
+	for _, rw := range rewards {
+		if rw.Level <= level {
+			earned = append(earned, rw)
+		}
+	}
+	if len(earned) == 0 {
+		return
+	}
+
+	if stack {
+		for _, rw := range earned {
+			if _, ok := held[rw.RoleID]; !ok {
+				if err := s.GuildMemberRoleAdd(guildID, userID, rw.RoleID); err != nil {
+					log.Warn().Err(err).Str("guild", guildID).Str("role", rw.RoleID).Msg("levels: add reward role")
+				}
+			}
+		}
+		return
+	}
+
+	// Non-stacking: keep only the highest earned reward.
+	highest := earned[len(earned)-1].RoleID
+	if _, ok := held[highest]; !ok {
+		if err := s.GuildMemberRoleAdd(guildID, userID, highest); err != nil {
+			log.Warn().Err(err).Str("guild", guildID).Str("role", highest).Msg("levels: add reward role")
+		}
+	}
+	for _, rw := range rewards {
+		if rw.RoleID == highest {
+			continue
+		}
+		if _, ok := held[rw.RoleID]; ok {
+			if err := s.GuildMemberRoleRemove(guildID, userID, rw.RoleID); err != nil {
+				log.Warn().Err(err).Str("guild", guildID).Str("role", rw.RoleID).Msg("levels: remove old reward role")
+			}
+		}
 	}
 }
 

@@ -43,9 +43,8 @@ func handleTimeout(c *core.Context) {
 		return
 	}
 
-	tryDM(c, user.ID, c.Embed().Title("You have been timed out").
-		Description(fmt.Sprintf("You were timed out in **%s** for %s.", guildName(c), discordutil.FormatDuration(dur))).
-		Field("Reason", reason, false).AsError().Build())
+	dmNotify(c, user.ID, "timeout", "You have been timed out",
+		fmt.Sprintf("You were timed out in **%s** for %s.", guildName(c), discordutil.FormatDuration(dur)), reason)
 
 	recordAndLog(c, modlog.EventTimeout, "timeout", user.ID, user.Username, reason, &dur)
 	_ = c.Reply(c.Embed().Title("Member Timed Out").

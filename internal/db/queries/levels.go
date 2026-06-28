@@ -31,20 +31,21 @@ type LevelConfig struct {
 	XPCooldownSecs    int
 	NoXPRoles         []string
 	NoXPChannels      []string
+	StackRewards      bool
 }
 
 // GetLevelConfig fetches level configuration, returning defaults if no row exists.
 func (s *Store) GetLevelConfig(ctx context.Context, guildID string) (*LevelConfig, error) {
 	row := s.pool.QueryRow(ctx, `
 		SELECT guild_id, enabled, announce_channel_id, announce_msg,
-		       xp_min, xp_max, xp_cooldown_secs, no_xp_roles, no_xp_channels
+		       xp_min, xp_max, xp_cooldown_secs, no_xp_roles, no_xp_channels, stack_rewards
 		FROM level_config WHERE guild_id = $1`, guildID)
 
 	var c LevelConfig
 	err := row.Scan(&c.GuildID, &c.Enabled, &c.AnnounceChannelID, &c.AnnounceMsg,
-		&c.XPMin, &c.XPMax, &c.XPCooldownSecs, &c.NoXPRoles, &c.NoXPChannels)
+		&c.XPMin, &c.XPMax, &c.XPCooldownSecs, &c.NoXPRoles, &c.NoXPChannels, &c.StackRewards)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return &LevelConfig{GuildID: guildID, Enabled: true, XPMin: 15, XPMax: 40, XPCooldownSecs: 60}, nil
+		return &LevelConfig{GuildID: guildID, Enabled: true, XPMin: 15, XPMax: 40, XPCooldownSecs: 60, StackRewards: true}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -56,8 +57,8 @@ func (s *Store) GetLevelConfig(ctx context.Context, guildID string) (*LevelConfi
 func (s *Store) UpsertLevelConfig(ctx context.Context, c *LevelConfig) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO level_config (guild_id, enabled, announce_channel_id, announce_msg,
-			xp_min, xp_max, xp_cooldown_secs, no_xp_roles, no_xp_channels)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			xp_min, xp_max, xp_cooldown_secs, no_xp_roles, no_xp_channels, stack_rewards)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		ON CONFLICT (guild_id) DO UPDATE SET
 			enabled = EXCLUDED.enabled,
 			announce_channel_id = EXCLUDED.announce_channel_id,
@@ -66,10 +67,57 @@ func (s *Store) UpsertLevelConfig(ctx context.Context, c *LevelConfig) error {
 			xp_max = EXCLUDED.xp_max,
 			xp_cooldown_secs = EXCLUDED.xp_cooldown_secs,
 			no_xp_roles = EXCLUDED.no_xp_roles,
-			no_xp_channels = EXCLUDED.no_xp_channels`,
+			no_xp_channels = EXCLUDED.no_xp_channels,
+			stack_rewards = EXCLUDED.stack_rewards`,
 		c.GuildID, c.Enabled, c.AnnounceChannelID, c.AnnounceMsg,
-		c.XPMin, c.XPMax, c.XPCooldownSecs, c.NoXPRoles, c.NoXPChannels)
+		c.XPMin, c.XPMax, c.XPCooldownSecs, c.NoXPRoles, c.NoXPChannels, c.StackRewards)
 	return err
+}
+
+// LevelReward maps a level threshold to a role granted on reaching it.
+type LevelReward struct {
+	Level  int
+	RoleID string
+}
+
+// ListLevelRewards returns all configured rewards for a guild, ordered by level.
+func (s *Store) ListLevelRewards(ctx context.Context, guildID string) ([]LevelReward, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT level, role_id FROM level_rewards WHERE guild_id = $1 ORDER BY level ASC`, guildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []LevelReward
+	for rows.Next() {
+		var r LevelReward
+		if err := rows.Scan(&r.Level, &r.RoleID); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// SetLevelReward creates or updates the role granted at a level.
+func (s *Store) SetLevelReward(ctx context.Context, guildID string, level int, roleID string) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO level_rewards (guild_id, level, role_id)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (guild_id, level) DO UPDATE SET role_id = EXCLUDED.role_id`,
+		guildID, level, roleID)
+	return err
+}
+
+// DeleteLevelReward removes the reward configured for a level. Returns whether
+// a row was deleted.
+func (s *Store) DeleteLevelReward(ctx context.Context, guildID string, level int) (bool, error) {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM level_rewards WHERE guild_id = $1 AND level = $2`, guildID, level)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // GetLevel fetches a single user's level entry. Returns db.ErrNotFound if absent.

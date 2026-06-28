@@ -113,9 +113,11 @@ func (s *Store) DeleteGuild(ctx context.Context, guildID string) error {
 	defer tx.Rollback(ctx) //nolint:errcheck // rollback is a no-op after commit
 
 	tables := []string{
-		"levels", "level_config", "warnings", "mod_actions", "automod_config",
+		"levels", "level_config", "level_rewards", "warnings", "mod_actions", "automod_config",
 		"reaction_role_menus", "jtc_config", "jtc_channels", "afk_users",
-		"modlog_overrides", "access_control", "music_queue", "audit_log", "guilds",
+		"modlog_overrides", "access_control", "music_queue", "audit_log",
+		"welcome_config", "autorole_config", "mod_settings",
+		"starboard_config", "starboard_messages", "guilds",
 	}
 	for _, t := range tables {
 		if _, err := tx.Exec(ctx, "DELETE FROM "+t+" WHERE guild_id = $1", guildID); err != nil {

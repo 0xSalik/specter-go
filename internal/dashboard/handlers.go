@@ -155,6 +155,7 @@ func (s *Server) handleAutomodPage(w http.ResponseWriter, r *http.Request) {
 	pd := s.base(r, "Automod Settings")
 	pd.Data["Config"] = cfg
 	pd.Data["BadWords"] = strings.Join(cfg.BadWords, "\n")
+	pd.Data["Rules"] = automodRules
 	s.render(w, "automod.html", pd)
 }
 
@@ -188,6 +189,17 @@ func (s *Server) handleAutomodSave(w http.ResponseWriter, r *http.Request) {
 		cfg.Action = a
 	}
 
+	// Per-rule role scoping: include_<rule> / exclude_<rule> as CSV role IDs.
+	scopes := map[string]queries.RuleScope{}
+	for _, rule := range automodRules {
+		inc := splitCSV(r.FormValue("include_" + rule))
+		exc := splitCSV(r.FormValue("exclude_" + rule))
+		if len(inc) > 0 || len(exc) > 0 {
+			scopes[rule] = queries.RuleScope{Include: inc, Exclude: exc}
+		}
+	}
+	cfg.RuleRoleScopes = scopes
+
 	if err := s.store.UpsertAutomodConfig(ctx, cfg); err != nil {
 		http.Error(w, "failed to save", http.StatusInternalServerError)
 		return
@@ -216,8 +228,11 @@ func (s *Server) handleModlogsPage(w http.ResponseWriter, r *http.Request) {
 
 var modlogEventTypes = []string{
 	"message_delete", "message_edit", "member_join", "member_leave", "member_update",
-	"ban", "unban", "kick", "warn", "channel_update", "guild_update",
+	"ban", "unban", "kick", "warn", "channel_update", "guild_update", "voice_state",
 }
+
+// automodRules lists the rule keys that support per-rule role scoping.
+var automodRules = []string{"spam", "invite", "link", "caps", "badwords"}
 
 func (s *Server) handleModlogsSave(w http.ResponseWriter, r *http.Request) {
 	gid := guildIDFrom(r)
@@ -250,7 +265,7 @@ func (s *Server) handleAccessPage(w http.ResponseWriter, r *http.Request) {
 	rules, _ := s.store.ListAllAccessRules(ctx, gid)
 	pd := s.base(r, "Access Control")
 	pd.Data["Rules"] = rules
-	pd.Data["Groups"] = []string{"moderation", "fun", "music", "levels", "user", "voice", "reactionroles", "system"}
+	pd.Data["Groups"] = []string{"moderation", "fun", "music", "levels", "user", "voice", "reactionroles", "settings", "system"}
 	s.render(w, "access.html", pd)
 }
 
@@ -385,7 +400,261 @@ func (s *Server) handleAuditPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "audit.html", pd)
 }
 
+// ---- Welcome / goodbye ----
+
+func (s *Server) handleWelcomePage(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetWelcomeConfig(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load welcome config", http.StatusInternalServerError)
+		return
+	}
+	pd := s.base(r, "Welcome Messages")
+	pd.Data["Config"] = cfg
+	pd.Data["Channels"] = s.textChannels(gid)
+	s.render(w, "welcome.html", pd)
+}
+
+func (s *Server) handleWelcomeSave(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetWelcomeConfig(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load config", http.StatusInternalServerError)
+		return
+	}
+	cfg.JoinEnabled = r.FormValue("join_enabled") == "on"
+	cfg.JoinChannelID = optPtr(r.FormValue("join_channel"))
+	cfg.JoinMessage = optPtr(r.FormValue("join_message"))
+	cfg.JoinDMEnabled = r.FormValue("join_dm_enabled") == "on"
+	cfg.JoinDMMessage = optPtr(r.FormValue("join_dm_message"))
+	cfg.LeaveEnabled = r.FormValue("leave_enabled") == "on"
+	cfg.LeaveChannelID = optPtr(r.FormValue("leave_channel"))
+	cfg.LeaveMessage = optPtr(r.FormValue("leave_message"))
+	cfg.UseEmbed = r.FormValue("use_embed") == "on"
+	if err := s.store.UpsertWelcomeConfig(ctx, cfg); err != nil {
+		http.Error(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	s.audit(ctx, r, "welcome.update", nil, map[string]any{"join": cfg.JoinEnabled, "leave": cfg.LeaveEnabled})
+	http.Redirect(w, r, "/dashboard/"+gid+"/welcome", http.StatusSeeOther)
+}
+
+// ---- Autorole ----
+
+func (s *Server) handleAutorolePage(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetAutoroleConfig(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load autorole config", http.StatusInternalServerError)
+		return
+	}
+	pd := s.base(r, "Autorole")
+	pd.Data["Config"] = cfg
+	pd.Data["Roles"] = s.roles(gid)
+	s.render(w, "autorole.html", pd)
+}
+
+func (s *Server) handleAutoroleSave(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetAutoroleConfig(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load config", http.StatusInternalServerError)
+		return
+	}
+	cfg.Enabled = r.FormValue("enabled") == "on"
+	cfg.RoleIDs = r.Form["role_ids"]
+	cfg.BotRoleIDs = r.Form["bot_role_ids"]
+	if err := s.store.UpsertAutoroleConfig(ctx, cfg); err != nil {
+		http.Error(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	s.audit(ctx, r, "autorole.update", nil, map[string]any{"enabled": cfg.Enabled})
+	http.Redirect(w, r, "/dashboard/"+gid+"/autorole", http.StatusSeeOther)
+}
+
+// ---- Level role rewards ----
+
+func (s *Server) handleLevelRolesPage(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetLevelConfig(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load level config", http.StatusInternalServerError)
+		return
+	}
+	rewards, _ := s.store.ListLevelRewards(ctx, gid)
+	pd := s.base(r, "Level Rewards")
+	pd.Data["Config"] = cfg
+	pd.Data["Rewards"] = rewards
+	pd.Data["Roles"] = s.roles(gid)
+	s.render(w, "levelroles.html", pd)
+}
+
+func (s *Server) handleLevelRolesSave(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	switch r.FormValue("op") {
+	case "add":
+		level := atoiDefault(r.FormValue("level"), 0)
+		roleID := strings.TrimSpace(r.FormValue("role_id"))
+		if level < 1 || roleID == "" {
+			http.Error(w, "level (1+) and role are required", http.StatusBadRequest)
+			return
+		}
+		if err := s.store.SetLevelReward(ctx, gid, level, roleID); err != nil {
+			http.Error(w, "failed to save reward", http.StatusInternalServerError)
+			return
+		}
+		s.audit(ctx, r, "levelrole.set", nil, map[string]any{"level": level, "role": roleID})
+	case "delete":
+		level := atoiDefault(r.FormValue("level"), 0)
+		if _, err := s.store.DeleteLevelReward(ctx, gid, level); err != nil {
+			http.Error(w, "failed to delete reward", http.StatusInternalServerError)
+			return
+		}
+		s.audit(ctx, r, "levelrole.delete", nil, map[string]any{"level": level})
+	case "stack":
+		cfg, err := s.store.GetLevelConfig(ctx, gid)
+		if err != nil {
+			http.Error(w, "failed to load config", http.StatusInternalServerError)
+			return
+		}
+		cfg.StackRewards = r.FormValue("stack_rewards") == "on"
+		if err := s.store.UpsertLevelConfig(ctx, cfg); err != nil {
+			http.Error(w, "failed to save", http.StatusInternalServerError)
+			return
+		}
+		s.audit(ctx, r, "levelrole.stack", nil, map[string]any{"stack": cfg.StackRewards})
+	}
+	http.Redirect(w, r, "/dashboard/"+gid+"/levelroles", http.StatusSeeOther)
+}
+
+// ---- Starboard ----
+
+func (s *Server) handleStarboardPage(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetStarboardConfig(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load starboard config", http.StatusInternalServerError)
+		return
+	}
+	pd := s.base(r, "Starboard")
+	pd.Data["Config"] = cfg
+	pd.Data["Channels"] = s.textChannels(gid)
+	s.render(w, "starboard.html", pd)
+}
+
+func (s *Server) handleStarboardSave(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetStarboardConfig(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load config", http.StatusInternalServerError)
+		return
+	}
+	cfg.Enabled = r.FormValue("enabled") == "on"
+	cfg.ChannelID = optPtr(r.FormValue("channel"))
+	if e := strings.TrimSpace(r.FormValue("emoji")); e != "" {
+		cfg.Emoji = e
+	}
+	if t := atoiDefault(r.FormValue("threshold"), cfg.Threshold); t >= 1 {
+		cfg.Threshold = t
+	}
+	cfg.SelfStar = r.FormValue("self_star") == "on"
+	if cfg.Enabled && (cfg.ChannelID == nil || *cfg.ChannelID == "") {
+		http.Error(w, "a starboard channel is required when enabled", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.UpsertStarboardConfig(ctx, cfg); err != nil {
+		http.Error(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	s.audit(ctx, r, "starboard.update", nil, map[string]any{"enabled": cfg.Enabled})
+	http.Redirect(w, r, "/dashboard/"+gid+"/starboard", http.StatusSeeOther)
+}
+
+// ---- Moderation DM notifications ----
+
+func (s *Server) handleModNotifyPage(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetModSettings(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load mod settings", http.StatusInternalServerError)
+		return
+	}
+	pd := s.base(r, "Mod Notifications")
+	pd.Data["Config"] = cfg
+	s.render(w, "moddm.html", pd)
+}
+
+func (s *Server) handleModNotifySave(w http.ResponseWriter, r *http.Request) {
+	gid := guildIDFrom(r)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	cfg, err := s.store.GetModSettings(ctx, gid)
+	if err != nil {
+		http.Error(w, "failed to load config", http.StatusInternalServerError)
+		return
+	}
+	cfg.DMOnWarn = r.FormValue("dm_on_warn") == "on"
+	cfg.DMOnTimeout = r.FormValue("dm_on_timeout") == "on"
+	cfg.DMOnKick = r.FormValue("dm_on_kick") == "on"
+	cfg.DMOnBan = r.FormValue("dm_on_ban") == "on"
+	cfg.AppealMessage = optPtr(r.FormValue("appeal_message"))
+	if err := s.store.UpsertModSettings(ctx, cfg); err != nil {
+		http.Error(w, "failed to save", http.StatusInternalServerError)
+		return
+	}
+	s.audit(ctx, r, "modnotify.update", nil, nil)
+	http.Redirect(w, r, "/dashboard/"+gid+"/modnotify", http.StatusSeeOther)
+}
+
 // ---- helpers ----
+
+// optPtr returns a pointer to a trimmed string, or nil when empty.
+func optPtr(s string) *string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	return &s
+}
 
 func (s *Server) audit(ctx context.Context, r *http.Request, action string, target *string, detail any) {
 	sess := sessionFrom(r)
@@ -394,6 +663,24 @@ func (s *Server) audit(ctx context.Context, r *http.Request, action string, targ
 		return
 	}
 	_ = s.store.WriteAudit(ctx, gid, sess.UserID, action, target, detail)
+}
+
+// roles returns assignable guild roles (excluding @everyone and managed roles),
+// ordered from highest to lowest position for use in dashboard selects.
+func (s *Server) roles(guildID string) []*discordgo.Role {
+	g, err := s.session.State.Guild(guildID)
+	if err != nil || g == nil {
+		return nil
+	}
+	var out []*discordgo.Role
+	for _, role := range g.Roles {
+		if role.ID == guildID || role.Managed {
+			continue
+		}
+		out = append(out, role)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Position > out[j].Position })
+	return out
 }
 
 func (s *Server) textChannels(guildID string) []*discordgo.Channel {

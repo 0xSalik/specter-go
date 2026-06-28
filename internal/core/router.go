@@ -47,6 +47,14 @@ func (r *Router) Register(cmd Command) {
 		log.Warn().Msg("router: ignoring command with nil definition or handler")
 		return
 	}
+	// Surface the required permission to Discord so the client hides the command
+	// from members who lack it (e.g. non-mods never see /ban or /kick). Admins
+	// can still re-grant access per role/member in Server Settings → Integrations,
+	// and the custom access-control rules are enforced at runtime regardless.
+	if cmd.RequiredPerm != 0 && cmd.Def.DefaultMemberPermissions == nil {
+		perm := cmd.RequiredPerm
+		cmd.Def.DefaultMemberPermissions = &perm
+	}
 	r.commands[cmd.Def.Name] = cmd
 }
 

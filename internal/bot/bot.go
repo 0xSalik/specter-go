@@ -23,6 +23,7 @@ import (
 	"github.com/0xSalik/specter/internal/modlog"
 	"github.com/0xSalik/specter/internal/music"
 	"github.com/0xSalik/specter/internal/reactionroles"
+	"github.com/0xSalik/specter/internal/starboard"
 	"github.com/0xSalik/specter/internal/voice"
 
 	cmdfun "github.com/0xSalik/specter/internal/commands/fun"
@@ -30,6 +31,7 @@ import (
 	cmdmod "github.com/0xSalik/specter/internal/commands/moderation"
 	cmdmusic "github.com/0xSalik/specter/internal/commands/music"
 	cmdrr "github.com/0xSalik/specter/internal/commands/reactionroles"
+	cmdserver "github.com/0xSalik/specter/internal/commands/server"
 	cmdsystem "github.com/0xSalik/specter/internal/commands/system"
 	cmduser "github.com/0xSalik/specter/internal/commands/user"
 	cmdutils "github.com/0xSalik/specter/internal/commands/utils"
@@ -64,11 +66,11 @@ func New(cfg *config.Config, store *queries.Store) (*Bot, error) {
 	embed.Init(store)
 
 	deps := &core.Deps{
-		Session:       session,
-		Store:         store,
-		Gate:          access.NewGate(store),
-		Modlog:        modlog.New(store),
-		MessageCache:  modlog.NewMessageCache(),
+		Session:      session,
+		Store:        store,
+		Gate:         access.NewGate(store),
+		Modlog:       modlog.New(store),
+		MessageCache: modlog.NewMessageCache(),
 		Music: music.NewManager(session, music.NodeConfig{
 			Address:  cfg.LavalinkAddress,
 			Password: cfg.LavalinkPassword,
@@ -79,6 +81,7 @@ func New(cfg *config.Config, store *queries.Store) (*Bot, error) {
 		ReactionRoles: reactionroles.New(store),
 		JTC:           voice.New(store),
 		Invites:       invites.New(),
+		Starboard:     starboard.New(store),
 		Config:        cfg,
 	}
 
@@ -106,6 +109,7 @@ func registerCommands(r *core.Router) {
 	cmduser.Register(r)
 	cmdsystem.Register(r)
 	cmdutils.Register(r)
+	cmdserver.Register(r)
 }
 
 // Open connects to the gateway, registers slash commands, performs startup
@@ -118,14 +122,32 @@ func (b *Bot) Open() error {
 
 	appID := b.session.State.User.ID
 	defs := b.router.Definitions()
-	if _, err := b.session.ApplicationCommandBulkOverwrite(appID, b.cfg.DevGuildID, defs); err != nil {
-		return fmt.Errorf("register slash commands: %w", err)
+
+	// In development, register commands to a single guild for instant updates.
+	// Otherwise register globally so commands appear in every server the bot is
+	// in. DEV_GUILD_ID no longer gates production: it is only a dev convenience
+	// (and lets us clear stale guild-scoped commands when running in prod).
+	if b.cfg.IsDevelopment() && b.cfg.DevGuildID != "" {
+		if _, err := b.session.ApplicationCommandBulkOverwrite(appID, b.cfg.DevGuildID, defs); err != nil {
+			return fmt.Errorf("register slash commands to dev guild: %w", err)
+		}
+		log.Info().Int("count", len(defs)).Msgf("registered slash commands to dev guild %s (development mode)", b.cfg.DevGuildID)
+	} else {
+		if _, err := b.session.ApplicationCommandBulkOverwrite(appID, "", defs); err != nil {
+			return fmt.Errorf("register slash commands globally: %w", err)
+		}
+		log.Info().Int("count", len(defs)).Msg("registered slash commands globally (available in all servers)")
+
+		// Clear any leftover guild-scoped commands from a previous dev run so
+		// they don't appear duplicated alongside the global ones.
+		if b.cfg.DevGuildID != "" {
+			if _, err := b.session.ApplicationCommandBulkOverwrite(appID, b.cfg.DevGuildID, []*discordgo.ApplicationCommand{}); err != nil {
+				log.Warn().Err(err).Str("guild", b.cfg.DevGuildID).Msg("could not clear stale dev-guild commands")
+			} else {
+				log.Info().Str("guild", b.cfg.DevGuildID).Msg("cleared stale dev-guild slash commands")
+			}
+		}
 	}
-	scope := "globally"
-	if b.cfg.DevGuildID != "" {
-		scope = "to dev guild " + b.cfg.DevGuildID
-	}
-	log.Info().Int("count", len(defs)).Msgf("registered slash commands %s", scope)
 
 	// Connect to the Lavalink audio node. Failures are non-fatal: the bot keeps
 	// running (music commands report the backend is unavailable) and we retry

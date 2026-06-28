@@ -1,0 +1,47 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-1">Welcome &amp; Goodbye</h1>
+<p class="text-zinc-500 text-sm mb-6">Placeholders: <code>{user}</code> <code>{username}</code> <code>{server}</code> <code>{membercount}</code></p>
+{{with .Data.Config}}
+<form method="post" class="space-y-6 max-w-lg">
+  <div class="space-y-3 border-t border-zinc-800 pt-4">
+    <h2 class="text-sm uppercase tracking-wide text-zinc-400">Join message</h2>
+    <label class="flex items-center gap-2"><input type="checkbox" name="join_enabled" {{if .JoinEnabled}}checked{{end}}><span>Post a welcome message</span></label>
+    <div>
+      <label class="block text-xs text-zinc-400">Channel</label>
+      {{$sel := deref .JoinChannelID}}
+      <select name="join_channel" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+        <option value="">(none)</option>
+        {{range $.Data.Channels}}<option value="{{.ID}}" {{if eq .ID $sel}}selected{{end}}>#{{.Name}}</option>{{end}}
+      </select>
+    </div>
+    <div><label class="block text-xs text-zinc-400">Message</label><textarea name="join_message" rows="2" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">{{deref .JoinMessage}}</textarea></div>
+  </div>
+
+  <div class="space-y-3 border-t border-zinc-800 pt-4">
+    <h2 class="text-sm uppercase tracking-wide text-zinc-400">Welcome DM</h2>
+    <label class="flex items-center gap-2"><input type="checkbox" name="join_dm_enabled" {{if .JoinDMEnabled}}checked{{end}}><span>DM new members</span></label>
+    <div><label class="block text-xs text-zinc-400">DM message</label><textarea name="join_dm_message" rows="2" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">{{deref .JoinDMMessage}}</textarea></div>
+  </div>
+
+  <div class="space-y-3 border-t border-zinc-800 pt-4">
+    <h2 class="text-sm uppercase tracking-wide text-zinc-400">Goodbye message</h2>
+    <label class="flex items-center gap-2"><input type="checkbox" name="leave_enabled" {{if .LeaveEnabled}}checked{{end}}><span>Post a goodbye message</span></label>
+    <div>
+      <label class="block text-xs text-zinc-400">Channel</label>
+      {{$lsel := deref .LeaveChannelID}}
+      <select name="leave_channel" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">
+        <option value="">(none)</option>
+        {{range $.Data.Channels}}<option value="{{.ID}}" {{if eq .ID $lsel}}selected{{end}}>#{{.Name}}</option>{{end}}
+      </select>
+    </div>
+    <div><label class="block text-xs text-zinc-400">Message</label><textarea name="leave_message" rows="2" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">{{deref .LeaveMessage}}</textarea></div>
+  </div>
+
+  <div class="border-t border-zinc-800 pt-4">
+    <label class="flex items-center gap-2"><input type="checkbox" name="use_embed" {{if .UseEmbed}}checked{{end}}><span>Send as embeds (otherwise plain text)</span></label>
+  </div>
+  <button class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">Save</button>
+</form>
+{{end}}
+{{template "foot" .}}

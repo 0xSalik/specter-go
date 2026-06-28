@@ -1,0 +1,18 @@
+{{template "head" .}}
+{{template "guildnav" .}}
+<h1 class="text-2xl font-semibold mb-1">Moderation DM Notifications</h1>
+<p class="text-zinc-500 text-sm mb-6">DM members when a moderation action is taken against them.</p>
+{{with .Data.Config}}
+<form method="post" class="space-y-4 max-w-lg">
+  <label class="flex items-center gap-2"><input type="checkbox" name="dm_on_warn" {{if .DMOnWarn}}checked{{end}}><span>DM on warn</span></label>
+  <label class="flex items-center gap-2"><input type="checkbox" name="dm_on_timeout" {{if .DMOnTimeout}}checked{{end}}><span>DM on timeout</span></label>
+  <label class="flex items-center gap-2"><input type="checkbox" name="dm_on_kick" {{if .DMOnKick}}checked{{end}}><span>DM on kick</span></label>
+  <label class="flex items-center gap-2"><input type="checkbox" name="dm_on_ban" {{if .DMOnBan}}checked{{end}}><span>DM on ban</span></label>
+  <div class="border-t border-zinc-800 pt-4">
+    <label class="block text-xs text-zinc-400">Appeal note (appended to every moderation DM)</label>
+    <textarea name="appeal_message" rows="2" class="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1">{{deref .AppealMessage}}</textarea>
+  </div>
+  <button class="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">Save</button>
+</form>
+{{end}}
+{{template "foot" .}}

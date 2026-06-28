@@ -63,6 +63,11 @@ func (h *Handlers) onGuildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemb
 	// Remember the member so a future leave can report tenure and roles.
 	h.deps.Invites.SnapshotMember(m.GuildID, m.Member)
 
+	// Apply autorole and post the welcome message (best-effort, non-blocking
+	// relative to the join log below).
+	h.applyAutorole(s, m)
+	h.handleWelcomeJoin(s, m)
+
 	h.deps.Modlog.Log(s, modlog.ModLogEvent{
 		GuildID:    m.GuildID,
 		EventType:  modlog.EventMemberJoin,
@@ -109,6 +114,8 @@ func (h *Handlers) onGuildMemberRemove(s *discordgo.Session, m *discordgo.GuildM
 	if count := guildMemberCount(s, m.GuildID); count > 0 {
 		extra["Member Count"] = fmt.Sprintf("%d", count)
 	}
+
+	h.handleWelcomeLeave(s, m)
 
 	h.deps.Modlog.Log(s, modlog.ModLogEvent{
 		GuildID:    m.GuildID,

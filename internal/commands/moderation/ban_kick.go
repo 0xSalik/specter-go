@@ -32,9 +32,8 @@ func handleBan(c *core.Context) {
 		return
 	}
 
-	tryDM(c, user.ID, c.Embed().Title("You have been banned").
-		Description(fmt.Sprintf("You were banned from **%s**.", guildName(c))).
-		Field("Reason", reason, false).AsError().Build())
+	dmNotify(c, user.ID, "ban", "You have been banned",
+		fmt.Sprintf("You were banned from **%s**.", guildName(c)), reason)
 
 	if err := c.Session.GuildBanCreateWithReason(c.GuildID, user.ID, reason, delDays); err != nil {
 		_ = c.Errorf("Failed to ban the user. Check the bot's permissions and role position.", err)
@@ -87,9 +86,8 @@ func handleKick(c *core.Context) {
 		return
 	}
 
-	tryDM(c, user.ID, c.Embed().Title("You have been kicked").
-		Description(fmt.Sprintf("You were kicked from **%s**.", guildName(c))).
-		Field("Reason", reason, false).AsError().Build())
+	dmNotify(c, user.ID, "kick", "You have been kicked",
+		fmt.Sprintf("You were kicked from **%s**.", guildName(c)), reason)
 
 	if err := c.Session.GuildMemberDeleteWithReason(c.GuildID, user.ID, reason); err != nil {
 		_ = c.Errorf("Failed to kick the user. Check the bot's permissions and role position.", err)

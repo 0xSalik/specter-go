@@ -96,6 +96,30 @@ func ContainsBadWord(content string, badWords []string) bool {
 	return false
 }
 
+// RuleAppliesToRoles reports whether a rule should apply to a member given its
+// per-rule role scope. A member with an excluded role is never caught; if the
+// include list is non-empty the member must hold one of those roles.
+func RuleAppliesToRoles(scope queries.RuleScope, userRoles []string) bool {
+	roleSet := make(map[string]struct{}, len(userRoles))
+	for _, r := range userRoles {
+		roleSet[r] = struct{}{}
+	}
+	for _, r := range scope.Exclude {
+		if _, ok := roleSet[r]; ok {
+			return false
+		}
+	}
+	if len(scope.Include) > 0 {
+		for _, r := range scope.Include {
+			if _, ok := roleSet[r]; ok {
+				return true
+			}
+		}
+		return false
+	}
+	return true
+}
+
 // IsExempt reports whether a member's roles or the channel are exempt.
 func IsExempt(userRoles []string, channelID string, exemptRoles, exemptChannels []string) bool {
 	for _, c := range exemptChannels {
@@ -201,19 +225,28 @@ func (c *Checker) Evaluate(cfg *queries.AutomodConfig, key, content string, user
 		return nil
 	}
 
-	if cfg.AntiSpamEnabled && c.RecordAndCheckSpam(key, cfg.AntiSpamThreshold, cfg.AntiSpamWindowSecs) {
+	// applies reports whether a rule is in effect for this member after applying
+	// its optional per-rule role scope.
+	applies := func(rule string) bool {
+		if cfg.RuleRoleScopes == nil {
+			return true
+		}
+		return RuleAppliesToRoles(cfg.RuleRoleScopes[rule], userRoles)
+	}
+
+	if cfg.AntiSpamEnabled && applies("spam") && c.RecordAndCheckSpam(key, cfg.AntiSpamThreshold, cfg.AntiSpamWindowSecs) {
 		return &Violation{Rule: "spam", Reason: "Sending messages too quickly.", Action: cfg.Action}
 	}
-	if cfg.AntiInviteEnabled && HasInvite(content) {
+	if cfg.AntiInviteEnabled && applies("invite") && HasInvite(content) {
 		return &Violation{Rule: "invite", Reason: "Posting Discord invite links is not allowed.", Action: cfg.Action}
 	}
-	if cfg.AntiLinkEnabled && HasDisallowedLink(content, cfg.AllowedLinkDomains) {
+	if cfg.AntiLinkEnabled && applies("link") && HasDisallowedLink(content, cfg.AllowedLinkDomains) {
 		return &Violation{Rule: "link", Reason: "Posting external links is not allowed.", Action: cfg.Action}
 	}
-	if cfg.AntiCapsEnabled && ExceedsCaps(content, cfg.CapsThresholdPct) {
+	if cfg.AntiCapsEnabled && applies("caps") && ExceedsCaps(content, cfg.CapsThresholdPct) {
 		return &Violation{Rule: "caps", Reason: "Excessive capitalization.", Action: cfg.Action}
 	}
-	if cfg.BadWordsEnabled && ContainsBadWord(content, cfg.BadWords) {
+	if cfg.BadWordsEnabled && applies("badwords") && ContainsBadWord(content, cfg.BadWords) {
 		return &Violation{Rule: "badwords", Reason: "Message contained a prohibited word.", Action: cfg.Action}
 	}
 	return nil

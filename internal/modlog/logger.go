@@ -34,6 +34,7 @@ const (
 	EventGuildUpdate   = "guild_update"
 	EventRoleUpdate    = "role_update"
 	EventAutomod       = "automod"
+	EventVoiceState    = "voice_state"
 )
 
 // ModLogEvent describes a single loggable occurrence.
@@ -73,7 +74,7 @@ func ChannelField(g *queries.GuildConfig, eventType string) *string {
 		return g.KickLogID
 	case EventBan, EventUnban:
 		return g.BanLogID
-	case EventChannelUpdate, EventGuildUpdate, EventRoleUpdate:
+	case EventChannelUpdate, EventGuildUpdate, EventRoleUpdate, EventVoiceState:
 		return g.GeneralLogID
 	default:
 		return g.GeneralLogID
@@ -183,6 +184,8 @@ func titleFor(eventType string) string {
 		return "Role Updated"
 	case EventAutomod:
 		return "Automod Action"
+	case EventVoiceState:
+		return "Voice Activity"
 	default:
 		return "Event"
 	}

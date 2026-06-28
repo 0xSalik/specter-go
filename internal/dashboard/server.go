@@ -62,6 +62,14 @@ func New(cfg *config.Config, store *queries.Store, session *discordgo.Session) (
 			}
 			return out
 		},
+		"isin": func(items []string, v string) bool {
+			for _, it := range items {
+				if it == v {
+					return true
+				}
+			}
+			return false
+		},
 	}).ParseFS(templatesFS, "templates/*.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
@@ -113,6 +121,16 @@ func (s *Server) Routes() http.Handler {
 			r.Post("/levels", s.handleLevelsSave)
 			r.Get("/automod", s.handleAutomodPage)
 			r.Post("/automod", s.handleAutomodSave)
+			r.Get("/welcome", s.handleWelcomePage)
+			r.Post("/welcome", s.handleWelcomeSave)
+			r.Get("/autorole", s.handleAutorolePage)
+			r.Post("/autorole", s.handleAutoroleSave)
+			r.Get("/levelroles", s.handleLevelRolesPage)
+			r.Post("/levelroles", s.handleLevelRolesSave)
+			r.Get("/starboard", s.handleStarboardPage)
+			r.Post("/starboard", s.handleStarboardSave)
+			r.Get("/modnotify", s.handleModNotifyPage)
+			r.Post("/modnotify", s.handleModNotifySave)
 			r.Get("/modlogs", s.handleModlogsPage)
 			r.Post("/modlogs", s.handleModlogsSave)
 			r.Get("/access", s.handleAccessPage)
