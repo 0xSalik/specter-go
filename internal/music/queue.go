@@ -7,16 +7,32 @@
 package music
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	"github.com/disgoorg/disgolink/v4/lavalink"
 )
 
 // Track is a single queued item: a resolved Lavalink track plus the ID of the
-// user who requested it.
+// user who requested it. QID is a stable per-queue identifier used by the
+// dashboard to target a specific entry for removal or reordering.
 type Track struct {
 	lavalink.Track
 	Requester string
+	QID       string
+}
+
+// newTrack wraps a resolved Lavalink track with requester metadata and a fresh
+// stable queue identifier.
+func newTrack(t lavalink.Track, requester string) Track {
+	return Track{Track: t, Requester: requester, QID: newQID()}
+}
+
+func newQID() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // Title returns the track title, falling back to the identifier.
@@ -34,6 +50,17 @@ func (t Track) Author() string { return t.Info.Author }
 func (t Track) URL() string {
 	if t.Info.URI != nil {
 		return *t.Info.URI
+	}
+	return ""
+}
+
+// Source returns the source plugin name (e.g. "youtube", "spotify").
+func (t Track) Source() string { return t.Info.SourceName }
+
+// Artwork returns the cover/thumbnail URL if the source provides one.
+func (t Track) Artwork() string {
+	if t.Info.ArtworkURL != nil {
+		return *t.Info.ArtworkURL
 	}
 	return ""
 }

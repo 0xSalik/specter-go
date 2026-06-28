@@ -360,27 +360,6 @@ func (s *Server) handleReactionRolesPage(w http.ResponseWriter, r *http.Request)
 	s.render(w, "reactionroles.html", pd)
 }
 
-// ---- Music ----
-
-func (s *Server) handleMusicPage(w http.ResponseWriter, r *http.Request) {
-	gid := guildIDFrom(r)
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	queue, _ := s.store.LoadQueue(ctx, gid)
-	pd := s.base(r, "Music")
-	pd.Data["Queue"] = queue
-	s.render(w, "music.html", pd)
-}
-
-func (s *Server) handleMusicClear(w http.ResponseWriter, r *http.Request) {
-	gid := guildIDFrom(r)
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-	_ = s.store.ClearQueue(ctx, gid)
-	s.audit(ctx, r, "music.clear_queue", nil, nil)
-	http.Redirect(w, r, "/dashboard/"+gid+"/music", http.StatusSeeOther)
-}
-
 // ---- Audit ----
 
 func (s *Server) handleAuditPage(w http.ResponseWriter, r *http.Request) {

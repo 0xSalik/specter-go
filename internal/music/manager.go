@@ -163,10 +163,20 @@ func (m *Manager) Load(ctx context.Context, query string) (LoadResult, error) {
 	}
 }
 
-// Play joins the voice channel (if needed), enqueues the supplied tracks, and
-// starts playback when idle. It returns whether the first track started playing
-// immediately and, when queued, the queue position of the first added track.
+// Play joins the voice channel (if needed), enqueues the supplied tracks at the
+// end of the queue, and starts playback when idle. It returns whether the first
+// track started playing immediately and, when queued, the queue position of the
+// first added track.
 func (m *Manager) Play(ctx context.Context, guildID, voiceChannelID, requester string, tracks []lavalink.Track) (started bool, position int, err error) {
+	return m.Add(ctx, guildID, voiceChannelID, requester, tracks, false)
+}
+
+// Add joins the voice channel (if needed) and enqueues the supplied tracks,
+// starting playback immediately when the player is idle. When atFront is true
+// the tracks are inserted at the head of the queue ("play next") instead of the
+// tail. It returns whether the first track started playing immediately and,
+// when queued, the 1-based queue position of the first added track.
+func (m *Manager) Add(ctx context.Context, guildID, voiceChannelID, requester string, tracks []lavalink.Track, atFront bool) (started bool, position int, err error) {
 	if !m.Ready() {
 		return false, 0, ErrNotReady
 	}
@@ -183,19 +193,24 @@ func (m *Manager) Play(ctx context.Context, guildID, voiceChannelID, requester s
 		return false, 0, err
 	}
 
+	queued := make([]Track, len(tracks))
+	for i, t := range tracks {
+		queued[i] = newTrack(t, requester)
+	}
+
 	gp.mu.Lock()
 	gp.vcID = voiceChannelID
 	if gp.current == nil {
-		first := Track{Track: tracks[0], Requester: requester}
+		first := queued[0]
 		gp.current = &first
-		for _, t := range tracks[1:] {
-			gp.queue = append(gp.queue, Track{Track: t, Requester: requester})
+		if len(queued) > 1 {
+			gp.queue = append(append([]Track{}, queued[1:]...), gp.queue...)
 		}
 		vol := gp.volume
 		gp.mu.Unlock()
 
 		player := m.link.Player(snowflake.MustParse(guildID))
-		if err := player.Update(ctx, disgolink.WithTrack(tracks[0]), disgolink.WithVolume(vol)); err != nil {
+		if err := player.Update(ctx, disgolink.WithTrack(first.Track), disgolink.WithVolume(vol)); err != nil {
 			gp.mu.Lock()
 			gp.current = nil
 			gp.mu.Unlock()
@@ -204,9 +219,14 @@ func (m *Manager) Play(ctx context.Context, guildID, voiceChannelID, requester s
 		return true, 0, nil
 	}
 
-	pos := len(gp.queue) + 1
-	for _, t := range tracks {
-		gp.queue = append(gp.queue, Track{Track: t, Requester: requester})
+	if atFront {
+		gp.queue = append(append([]Track{}, queued...), gp.queue...)
+	} else {
+		gp.queue = append(gp.queue, queued...)
+	}
+	pos := 1
+	if !atFront {
+		pos = len(gp.queue) - len(queued) + 1
 	}
 	gp.mu.Unlock()
 	return false, pos, nil

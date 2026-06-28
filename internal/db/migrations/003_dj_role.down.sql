@@ -1,0 +1,1 @@
+ALTER TABLE guilds DROP COLUMN IF EXISTS dj_role_id;

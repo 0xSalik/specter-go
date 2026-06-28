@@ -91,7 +91,7 @@ func New(cfg *config.Config, store *queries.Store) (*Bot, error) {
 	session.AddHandler(router.Handle)
 	events.Register(session, deps)
 
-	dash, err := dashboard.New(cfg, store, session)
+	dash, err := dashboard.New(cfg, store, session, deps.Music)
 	if err != nil {
 		return nil, err
 	}

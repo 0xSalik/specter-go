@@ -63,6 +63,30 @@ func (s *Server) requireGuildAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// requireGuildMember ensures Specter is in the requested guild and the logged-in
+// user is a member of it. Unlike requireGuildAdmin it does NOT require Manage
+// Server, so the public music player is reachable by ordinary members.
+func (s *Server) requireGuildMember(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess := sessionFrom(r)
+		if sess == nil {
+			http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+			return
+		}
+		guildID := chi.URLParam(r, "guildID")
+		if g, err := s.session.State.Guild(guildID); err != nil || g == nil {
+			http.Error(w, "Specter is not a member of this server.", http.StatusForbidden)
+			return
+		}
+		if _, ok := s.resolveMember(guildID, sess.UserID); !ok {
+			http.Error(w, "You are not a member of this server.", http.StatusForbidden)
+			return
+		}
+		r = r.WithContext(context.WithValue(r.Context(), ctxGuildID, guildID))
+		next.ServeHTTP(w, r)
+	})
+}
+
 // manageableGuilds returns the user's manageable guilds, cached for 60 seconds.
 func (s *Server) manageableGuilds(parent context.Context, sess *queries.Session) map[string]string {
 	s.guildCacheMu.Lock()

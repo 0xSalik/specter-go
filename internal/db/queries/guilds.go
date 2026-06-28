@@ -23,6 +23,7 @@ type GuildConfig struct {
 	WarnLogID     *string
 	KickLogID     *string
 	BanLogID      *string
+	DJRoleID      *string
 }
 
 // EnsureGuild inserts a guild row with defaults if it does not already exist.
@@ -41,13 +42,13 @@ func (s *Store) GetGuild(ctx context.Context, guildID string) (*GuildConfig, err
 	row := s.pool.QueryRow(ctx, `
 		SELECT guild_id, embed_color, prefix, joined_at,
 		       log_category_id, general_log_id, user_log_id, message_log_id,
-		       warn_log_id, kick_log_id, ban_log_id
+		       warn_log_id, kick_log_id, ban_log_id, dj_role_id
 		FROM guilds WHERE guild_id = $1`, guildID)
 
 	var g GuildConfig
 	err := row.Scan(&g.GuildID, &g.EmbedColor, &g.Prefix, &g.JoinedAt,
 		&g.LogCategoryID, &g.GeneralLogID, &g.UserLogID, &g.MessageLogID,
-		&g.WarnLogID, &g.KickLogID, &g.BanLogID)
+		&g.WarnLogID, &g.KickLogID, &g.BanLogID, &g.DJRoleID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, db.ErrNotFound
 	}
@@ -61,6 +62,14 @@ func (s *Store) GetGuild(ctx context.Context, guildID string) (*GuildConfig, err
 func (s *Store) SetEmbedColor(ctx context.Context, guildID, color string) error {
 	_, err := s.pool.Exec(ctx,
 		`UPDATE guilds SET embed_color = $2 WHERE guild_id = $1`, guildID, color)
+	return err
+}
+
+// SetDJRole sets (or clears, when roleID is nil) the role allowed to control
+// the public music player.
+func (s *Store) SetDJRole(ctx context.Context, guildID string, roleID *string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE guilds SET dj_role_id = $2 WHERE guild_id = $1`, guildID, roleID)
 	return err
 }
 

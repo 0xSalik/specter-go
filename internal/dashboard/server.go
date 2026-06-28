@@ -20,6 +20,7 @@ import (
 
 	"github.com/0xSalik/specter/internal/config"
 	"github.com/0xSalik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/music"
 )
 
 //go:embed templates/*.html
@@ -30,12 +31,16 @@ type Server struct {
 	cfg     *config.Config
 	store   *queries.Store
 	session *discordgo.Session
+	music   *music.Manager
 	tmpl    *template.Template
 	oauth   *oauth2.Config
 	http    *http.Server
 
 	guildCacheMu sync.Mutex
 	guildCache   map[string]cachedGuilds // session token -> manageable guilds
+
+	nameCacheMu sync.Mutex
+	nameCache   map[string]string // userID -> display name
 }
 
 type cachedGuilds struct {
@@ -43,8 +48,9 @@ type cachedGuilds struct {
 	expires time.Time
 }
 
-// New constructs a dashboard Server.
-func New(cfg *config.Config, store *queries.Store, session *discordgo.Session) (*Server, error) {
+// New constructs a dashboard Server. The music manager may be nil (e.g. in
+// tests); the music player routes degrade gracefully when it is.
+func New(cfg *config.Config, store *queries.Store, session *discordgo.Session, mus *music.Manager) (*Server, error) {
 	tmpl, err := template.New("").Funcs(template.FuncMap{
 		"deref": func(p *string) string {
 			if p == nil {
@@ -79,8 +85,10 @@ func New(cfg *config.Config, store *queries.Store, session *discordgo.Session) (
 		cfg:        cfg,
 		store:      store,
 		session:    session,
+		music:      mus,
 		tmpl:       tmpl,
 		guildCache: make(map[string]cachedGuilds),
+		nameCache:  make(map[string]string),
 		oauth: &oauth2.Config{
 			ClientID:     cfg.DiscordClientID,
 			ClientSecret: cfg.DiscordClientSecret,
@@ -138,10 +146,19 @@ func (s *Server) Routes() http.Handler {
 			r.Get("/rapsheets", s.handleRapsheetsPage)
 			r.Post("/rapsheets/clear", s.handleRapsheetClear)
 			r.Get("/reactionroles", s.handleReactionRolesPage)
-			r.Get("/music", s.handleMusicPage)
-			r.Post("/music/clear", s.handleMusicClear)
 			r.Get("/audit", s.handleAuditPage)
 		})
+	})
+
+	// Public music player: viewable by any logged-in member of the guild (not
+	// gated on Manage Server), while mutating actions require the DJ role.
+	r.Route("/music-player/{guildID}", func(r chi.Router) {
+		r.Use(s.requireSession)
+		r.Use(s.requireGuildMember)
+		r.Get("/", s.handleMusicPlayerPage)
+		r.Get("/state", s.handleMusicState)
+		r.Post("/control", s.handleMusicControl)
+		r.Post("/djrole", s.handleSetDJRole)
 	})
 
 	return r

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}{{if .Guild}} · {{.Guild.Name}}{{end}}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<style>
+  .scrollbar-thin::-webkit-scrollbar{width:8px}
+  .scrollbar-thin::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px}
+  input[type=range]{-webkit-appearance:none;height:6px;border-radius:9999px;background:#3f3f46}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:9999px;background:#818cf8;cursor:pointer}
+  .drag-handle{cursor:grab}
+  .sortable-ghost{opacity:.4}
+</style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-950 to-black text-zinc-100">
+<div id="player"
+     data-guild="{{.GuildID}}"
+     class="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+
+  <!-- Top bar -->
+  <header class="flex items-center justify-between gap-4 mb-6">
+    <div class="flex items-center gap-3 min-w-0">
+      {{if and .Guild .Guild.Icon}}
+        <img src="https://cdn.discordapp.com/icons/{{.Guild.ID}}/{{.Guild.Icon}}.png?size=64" class="w-10 h-10 rounded-xl" alt="">
+      {{else}}
+        <div class="w-10 h-10 rounded-xl bg-indigo-600/30 grid place-items-center text-indigo-300 font-bold">♪</div>
+      {{end}}
+      <div class="min-w-0">
+        <div class="text-xs uppercase tracking-widest text-indigo-400">Music Player</div>
+        <div class="font-semibold truncate">{{if .Guild}}{{.Guild.Name}}{{else}}Server{{end}}</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-sm text-zinc-400">
+      <span id="status-pill" class="px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-400">connecting…</span>
+      {{if .Data.IsAdmin}}<a href="/dashboard/{{.GuildID}}" class="text-indigo-400 hover:underline">Dashboard</a>{{end}}
+      {{if .Username}}<a href="/logout" class="text-zinc-400 hover:text-zinc-200">Log out</a>{{end}}
+    </div>
+  </header>
+
+  <!-- Permission banner -->
+  <div id="dj-banner" class="hidden mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+    You can watch what's playing, but only members with the DJ role can control the player.
+  </div>
+
+  <div class="grid lg:grid-cols-5 gap-6">
+    <!-- Now playing -->
+    <section class="lg:col-span-2">
+      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <div class="aspect-square w-full rounded-xl overflow-hidden bg-zinc-800 grid place-items-center mb-4">
+          <img id="np-art" class="w-full h-full object-cover hidden" alt="">
+          <svg id="np-art-fallback" class="w-20 h-20 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l11-2v13M9 19a3 3 0 11-6 0 3 3 0 016 0zm11-2a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </div>
+
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <a id="np-title" href="#" target="_blank" rel="noopener" class="block text-lg font-semibold leading-tight truncate hover:underline">Nothing playing</a>
+            <div id="np-author" class="text-sm text-zinc-400 truncate">—</div>
+          </div>
+          <span id="np-source" class="shrink-0 px-2 py-0.5 rounded-md text-[11px] font-medium bg-zinc-800 text-zinc-300 hidden"></span>
+        </div>
+
+        <div id="np-requester" class="mt-2 text-xs text-zinc-500 hidden">Added by <span class="text-zinc-300"></span></div>
+
+        <!-- Progress -->
+        <div class="mt-4">
+          <div class="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+            <div id="np-bar" class="h-full bg-indigo-500 w-0 transition-[width] duration-500 ease-linear"></div>
+          </div>
+          <div class="flex justify-between text-[11px] text-zinc-500 mt-1.5">
+            <span id="np-pos">0:00</span>
+            <span id="np-dur">0:00</span>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="mt-5 flex items-center justify-center gap-3" id="controls">
+          <button data-action="toggle" class="ctl w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 grid place-items-center disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg id="icon-pause" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+            <svg id="icon-play" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button data-action="skip" title="Skip" class="ctl w-11 h-11 rounded-full bg-zinc-800 hover:bg-zinc-700 grid place-items-center disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 5v14l8-7zM16 5h2v14h-2z"/></svg>
+          </button>
+          <button data-action="stop" title="Stop & leave" class="ctl w-11 h-11 rounded-full bg-zinc-800 hover:bg-red-600/80 grid place-items-center disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+          </button>
+        </div>
+
+        <!-- Volume -->
+        <div class="mt-5 flex items-center gap-3">
+          <svg class="w-5 h-5 text-zinc-400 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 00-2.5-4v8a4.5 4.5 0 002.5-4z"/></svg>
+          <input id="volume" type="range" min="1" max="100" value="100" class="w-full disabled:opacity-40">
+          <span id="volume-val" class="w-10 text-right text-xs text-zinc-400">100%</span>
+        </div>
+      </div>
+
+      {{if .Data.IsAdmin}}
+      <form method="post" action="/music-player/{{.GuildID}}/djrole" class="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+        <label class="block text-xs uppercase tracking-widest text-zinc-500 mb-2">DJ role</label>
+        <div class="flex gap-2">
+          <select name="role_id" class="flex-1 rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm">
+            <option value="none">Anyone in a voice channel</option>
+            {{$dj := .Data.DJRoleID}}
+            {{range .Data.Roles}}<option value="{{.ID}}" {{if eq .ID $dj}}selected{{end}}>{{.Name}}</option>{{end}}
+          </select>
+          <button class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium">Save</button>
+        </div>
+        <p class="mt-2 text-xs text-zinc-500">Members with this role (and anyone who can Manage Server) may control playback.</p>
+      </form>
+      {{end}}
+    </section>
+
+    <!-- Queue + add -->
+    <section class="lg:col-span-3">
+      <div class="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+        <!-- Add bar -->
+        <form id="add-form" class="flex gap-2 mb-4">
+          <input id="add-query" type="text" autocomplete="off" placeholder="Search or paste a YouTube / Spotify / SoundCloud link or playlist…"
+                 class="flex-1 rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+          <button type="submit" data-mode="play" class="add-btn px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium whitespace-nowrap">Add</button>
+          <button type="button" data-mode="playnext" class="add-btn px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm whitespace-nowrap">Play next</button>
+        </form>
+
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-zinc-300">Up next <span id="queue-count" class="text-zinc-500"></span></h2>
+        </div>
+
+        <ul id="queue" class="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-thin pr-1"></ul>
+        <div id="queue-empty" class="text-sm text-zinc-500 py-10 text-center">The queue is empty. Add a song to get started.</div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 hidden px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm shadow-lg"></div>
+</div>
+
+<script>
+(function () {
+  const root = document.getElementById('player');
+  const gid = root.dataset.guild;
+  const base = '/music-player/' + gid;
+
+  let canControl = false;
+  let dragging = false;
+  let suppressVolume = false;
+  // Local progress tracking between polls.
+  let curId = null, curPos = 0, curDur = 0, curPlaying = false, lastTick = Date.now();
+
+  const $ = (id) => document.getElementById(id);
+
+  function fmt(ms) {
+    if (!ms || ms < 0) return '0:00';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    if (m >= 60) {
+      const h = Math.floor(m / 60);
+      return h + ':' + String(m % 60).padStart(2, '0') + ':' + String(r).padStart(2, '0');
+    }
+    return m + ':' + String(r).padStart(2, '0');
+  }
+
+  const sourceColors = {
+    youtube: 'bg-red-600/20 text-red-300',
+    youtubemusic: 'bg-red-600/20 text-red-300',
+    spotify: 'bg-green-600/20 text-green-300',
+    soundcloud: 'bg-orange-600/20 text-orange-300',
+    twitch: 'bg-purple-600/20 text-purple-300',
+  };
+  const sourceLabels = {
+    youtube: 'YouTube', youtubemusic: 'YouTube Music', spotify: 'Spotify',
+    soundcloud: 'SoundCloud', twitch: 'Twitch', http: 'Direct',
+  };
+
+  let toastTimer;
+  function toast(msg, error) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-sm shadow-lg border ' +
+      (error ? 'bg-red-900/80 border-red-700 text-red-100' : 'bg-zinc-800 border-zinc-700');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
+    t.classList.remove('hidden');
+  }
+
+  async function control(params) {
+    const body = new URLSearchParams(params);
+    try {
+      const res = await fetch(base + '/control', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast(data.error || ('Error ' + res.status), true); return null; }
+      render(data);
+      return data;
+    } catch (e) {
+      toast('Network error', true);
+      return null;
+    }
+  }
+
+  async function poll() {
+    if (dragging) return;
+    try {
+      const res = await fetch(base + '/state', { credentials: 'same-origin' });
+      if (!res.ok) return;
+      render(await res.json());
+    } catch (e) { /* keep last render */ }
+  }
+
+  function setStatus(state, ready) {
+    const pill = $('status-pill');
+    if (!ready) { pill.textContent = 'backend offline'; pill.className = 'px-2.5 py-1 rounded-full bg-red-900/60 text-red-200'; return; }
+    const map = { playing: ['Playing', 'bg-green-900/50 text-green-200'], paused: ['Paused', 'bg-amber-900/50 text-amber-200'], idle: ['Idle', 'bg-zinc-800 text-zinc-400'] };
+    const [label, cls] = map[state] || map.idle;
+    pill.textContent = label;
+    pill.className = 'px-2.5 py-1 rounded-full ' + cls;
+  }
+
+  function applyControlPerms() {
+    document.querySelectorAll('.ctl, .add-btn').forEach(b => b.disabled = !canControl);
+    $('add-query').disabled = !canControl;
+    $('volume').disabled = !canControl;
+    $('dj-banner').classList.toggle('hidden', canControl);
+  }
+
+  function render(st) {
+    canControl = !!st.canControl;
+    applyControlPerms();
+    setStatus(st.state, st.ready);
+
+    // Now playing.
+    const c = st.current;
+    const titleEl = $('np-title'), authEl = $('np-author'), srcEl = $('np-source'),
+          reqEl = $('np-requester'), art = $('np-art'), artFb = $('np-art-fallback');
+    if (c) {
+      titleEl.textContent = c.title || 'Unknown';
+      titleEl.href = c.url || '#';
+      authEl.textContent = c.author || '';
+      if (c.source) {
+        const key = c.source.toLowerCase();
+        srcEl.textContent = sourceLabels[key] || c.source;
+        srcEl.className = 'shrink-0 px-2 py-0.5 rounded-md text-[11px] font-medium ' + (sourceColors[key] || 'bg-zinc-800 text-zinc-300');
+        srcEl.classList.remove('hidden');
+      } else srcEl.classList.add('hidden');
+      if (c.requester) { reqEl.querySelector('span').textContent = c.requester; reqEl.classList.remove('hidden'); }
+      else reqEl.classList.add('hidden');
+      if (c.artwork) { art.src = c.artwork; art.classList.remove('hidden'); artFb.classList.add('hidden'); }
+      else { art.classList.add('hidden'); artFb.classList.remove('hidden'); }
+    } else {
+      titleEl.textContent = 'Nothing playing'; titleEl.href = '#';
+      authEl.textContent = '—'; srcEl.classList.add('hidden'); reqEl.classList.add('hidden');
+      art.classList.add('hidden'); artFb.classList.remove('hidden');
+    }
+
+    // Play/pause icon.
+    curPlaying = st.state === 'playing';
+    $('icon-pause').classList.toggle('hidden', !curPlaying);
+    $('icon-play').classList.toggle('hidden', curPlaying);
+
+    // Progress sync.
+    curId = c ? c.id : null;
+    curDur = c ? c.duration : 0;
+    curPos = st.position || 0;
+    lastTick = Date.now();
+    paintProgress();
+
+    // Volume (don't fight the user while dragging the slider).
+    if (!suppressVolume) {
+      $('volume').value = st.volume;
+      $('volume-val').textContent = st.volume + '%';
+    }
+
+    renderQueue(st.queue || []);
+  }
+
+  function paintProgress() {
+    const bar = $('np-bar');
+    if (!curDur || curDur <= 0) {
+      bar.style.width = curId ? '100%' : '0%';
+      $('np-pos').textContent = curId ? 'LIVE' : '0:00';
+      $('np-dur').textContent = curId ? '∞' : '0:00';
+      return;
+    }
+    const pct = Math.min(100, (curPos / curDur) * 100);
+    bar.style.width = pct + '%';
+    $('np-pos').textContent = fmt(curPos);
+    $('np-dur').textContent = fmt(curDur);
+  }
+
+  // Smooth local progress between polls.
+  setInterval(() => {
+    if (curPlaying && curDur > 0) {
+      const now = Date.now();
+      curPos += now - lastTick;
+      lastTick = now;
+      if (curPos > curDur) curPos = curDur;
+      paintProgress();
+    } else {
+      lastTick = Date.now();
+    }
+  }, 1000);
+
+  function trackRow(t) {
+    const li = document.createElement('li');
+    li.className = 'group flex items-center gap-3 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 px-3 py-2';
+    li.dataset.id = t.id;
+
+    const handle = document.createElement('div');
+    handle.className = 'drag-handle text-zinc-600 ' + (canControl ? '' : 'invisible');
+    handle.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 6h2v2H9zM13 6h2v2h-2zM9 11h2v2H9zM13 11h2v2h-2zM9 16h2v2H9zM13 16h2v2h-2z"/></svg>';
+
+    const thumb = document.createElement('div');
+    thumb.className = 'w-10 h-10 rounded-md bg-zinc-700 overflow-hidden shrink-0';
+    if (t.artwork) thumb.innerHTML = '<img src="' + t.artwork + '" class="w-full h-full object-cover" alt="">';
+
+    const meta = document.createElement('div');
+    meta.className = 'min-w-0 flex-1';
+    const title = document.createElement('div');
+    title.className = 'text-sm font-medium truncate';
+    title.textContent = t.title || 'Unknown';
+    const sub = document.createElement('div');
+    sub.className = 'text-xs text-zinc-500 truncate';
+    const srcLabel = t.source ? (sourceLabels[t.source.toLowerCase()] || t.source) : '';
+    sub.textContent = [t.author, srcLabel, t.requester ? 'added by ' + t.requester : ''].filter(Boolean).join(' · ');
+    meta.appendChild(title); meta.appendChild(sub);
+
+    const dur = document.createElement('div');
+    dur.className = 'text-xs text-zinc-500 tabular-nums shrink-0';
+    dur.textContent = t.isStream ? 'LIVE' : fmt(t.duration);
+
+    li.appendChild(handle); li.appendChild(thumb); li.appendChild(meta); li.appendChild(dur);
+
+    if (canControl) {
+      const rm = document.createElement('button');
+      rm.className = 'opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 shrink-0';
+      rm.title = 'Remove';
+      rm.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>';
+      rm.addEventListener('click', () => control({ action: 'remove', id: t.id }));
+      li.appendChild(rm);
+    }
+    return li;
+  }
+
+  function renderQueue(queue) {
+    const ul = $('queue'), empty = $('queue-empty'), count = $('queue-count');
+    count.textContent = queue.length ? '(' + queue.length + ')' : '';
+    empty.classList.toggle('hidden', queue.length > 0);
+    // Don't rebuild mid-drag.
+    if (dragging) return;
+    ul.innerHTML = '';
+    queue.forEach(t => ul.appendChild(trackRow(t)));
+  }
+
+  // Drag & drop reordering.
+  new Sortable($('queue'), {
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onStart: () => { dragging = true; },
+    onEnd: (evt) => {
+      dragging = false;
+      const id = evt.item.dataset.id;
+      if (id && evt.oldIndex !== evt.newIndex) control({ action: 'move', id: id, to: evt.newIndex });
+    },
+  });
+
+  // Wire controls.
+  document.querySelectorAll('#controls .ctl').forEach(btn => {
+    btn.addEventListener('click', () => { if (canControl) control({ action: btn.dataset.action }); });
+  });
+
+  // Add / play next.
+  function submitAdd(mode) {
+    const q = $('add-query').value.trim();
+    if (!q) return;
+    control({ action: mode, query: q }).then(d => { if (d) { $('add-query').value = ''; toast(mode === 'playnext' ? 'Queued to play next' : 'Added to queue'); } });
+  }
+  $('add-form').addEventListener('submit', (e) => { e.preventDefault(); submitAdd('play'); });
+  document.querySelectorAll('.add-btn[data-mode="playnext"]').forEach(b => b.addEventListener('click', () => submitAdd('playnext')));
+
+  // Volume.
+  const vol = $('volume');
+  vol.addEventListener('input', () => { suppressVolume = true; $('volume-val').textContent = vol.value + '%'; });
+  let volTimer;
+  vol.addEventListener('change', () => {
+    control({ action: 'volume', value: vol.value });
+    clearTimeout(volTimer);
+    volTimer = setTimeout(() => { suppressVolume = false; }, 1500);
+  });
+
+  poll();
+  setInterval(poll, 3000);
+})();
+</script>
+</body></html>

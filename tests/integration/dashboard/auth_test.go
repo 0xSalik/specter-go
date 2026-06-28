@@ -19,7 +19,7 @@ func newTestServer(t *testing.T) http.Handler {
 	session, err := discordgo.New("Bot test-token")
 	require.NoError(t, err)
 	cfg := &config.Config{DashboardPort: 0, DiscordClientID: "id", DiscordRedirectURI: "http://localhost/auth/callback"}
-	srv, err := dashboard.New(cfg, queries.New(nil), session)
+	srv, err := dashboard.New(cfg, queries.New(nil), session, nil)
 	require.NoError(t, err)
 	return srv.Routes()
 }

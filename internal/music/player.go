@@ -85,6 +85,54 @@ func (gp *GuildPlayer) QueueList() []Track {
 	return out
 }
 
+// RemoveByID drops the queued track with the given stable QID. It returns the
+// removed track and true on success, or ok=false when no entry matched (e.g.
+// the track already started playing).
+func (gp *GuildPlayer) RemoveByID(id string) (Track, bool) {
+	gp.mu.Lock()
+	defer gp.mu.Unlock()
+	for i, t := range gp.queue {
+		if t.QID == id {
+			removed := t
+			gp.queue = append(gp.queue[:i], gp.queue[i+1:]...)
+			return removed, true
+		}
+	}
+	return Track{}, false
+}
+
+// MoveByID moves the queued track with the given QID to the target 0-based
+// position within the queue, clamping out-of-range targets. It returns false
+// when no entry matched the id.
+func (gp *GuildPlayer) MoveByID(id string, to int) bool {
+	gp.mu.Lock()
+	defer gp.mu.Unlock()
+	from := -1
+	for i, t := range gp.queue {
+		if t.QID == id {
+			from = i
+			break
+		}
+	}
+	if from == -1 {
+		return false
+	}
+	if to < 0 {
+		to = 0
+	}
+	if to >= len(gp.queue) {
+		to = len(gp.queue) - 1
+	}
+	if to == from {
+		return true
+	}
+	t := gp.queue[from]
+	gp.queue = append(gp.queue[:from], gp.queue[from+1:]...)
+	rest := append([]Track{}, gp.queue[to:]...)
+	gp.queue = append(append(gp.queue[:to], t), rest...)
+	return true
+}
+
 // QueueLen returns the number of pending tracks.
 func (gp *GuildPlayer) QueueLen() int {
 	gp.mu.Lock()
