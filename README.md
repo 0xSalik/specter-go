@@ -32,7 +32,13 @@ Specter is a professional-grade Discord administration and utility bot written i
 
 ## Requirements
 
-- Go 1.23+
+**Docker deploy (recommended):** just **Docker Engine + the Compose v2 plugin**
+(`docker compose version` ≥ 2). Everything else — Go toolchain, PostgreSQL,
+Lavalink, yt-dlp, fonts — is built/installed inside the containers.
+
+**Running from source (local dev):**
+
+- Go 1.26+ (matches `go.mod`)
 - PostgreSQL 14+
 - A **Lavalink 4.2+** node for music (run via `docker compose up -d lavalink`; needs Java only if you run it outside Docker)
 - `yt-dlp` on `PATH` for the `/tiktok` and `/ytdownload` media commands (not music)
@@ -75,14 +81,47 @@ go run ./cmd/specter
 
 Migrations run automatically on startup. Slash commands register globally, or to `DEV_GUILD_ID` if set (instant updates while developing). The bot connects to Lavalink on startup and retries with backoff if the node isn't up yet, so music becomes available as soon as the node is reachable.
 
-### Docker Compose
+### Docker Compose (one-click deploy)
+
+Everything — the bot, PostgreSQL, and a Lavalink music node — runs from a single
+`docker compose up -d`. On a fresh server with Docker Engine + the Compose v2
+plugin installed:
 
 ```bash
-cp .env.example .env        # fill in Discord credentials
-docker compose up --build
+git clone <your-repo-url> specter && cd specter
+cp .env.example .env
+
+# Fill in the REQUIRED values (Discord token + OAuth creds, public redirect URI)
+# and generate a session secret:
+echo "DASHBOARD_SESSION_SECRET=$(openssl rand -hex 32)" >> .env
+nano .env                       # set DISCORD_TOKEN, DISCORD_CLIENT_ID/SECRET, etc.
+
+docker compose up -d --build
+docker compose logs -f specter  # watch it connect to Discord + Lavalink
 ```
 
-This starts Specter, PostgreSQL, and a Lavalink music node (which auto-downloads the youtube-source and LavaSrc plugins on first boot). The dashboard is available at `http://localhost:8080`.
+That's it. The stack:
+
+- **specter** — the bot + dashboard (`http://<host>:8080`). Database migrations
+  run automatically on startup.
+- **postgres** — data store, persisted in the `pgdata` volume. Only bound to
+  `127.0.0.1`.
+- **lavalink** — the music node, which **auto-downloads** the youtube-source and
+  LavaSrc plugins on first boot (needs outbound internet; first start takes
+  ~30–60s). Only bound to `127.0.0.1`.
+
+Notes:
+
+- Only port **8080** is published publicly; put it behind a reverse proxy
+  (Caddy/Nginx) with TLS for production and point `DISCORD_REDIRECT_URI` at the
+  HTTPS URL.
+- The bot retries the Lavalink connection with backoff, so ordering during the
+  first boot is handled automatically — music becomes available once the node
+  finishes downloading plugins.
+- Update to a new version with `git pull && docker compose up -d --build`.
+- For a pure container deploy you can remove the `127.0.0.1:5432`/`127.0.0.1:2333`
+  `ports` blocks from `docker-compose.yml` entirely (they exist only for local
+  `go run` / debugging).
 
 ## Project layout
 

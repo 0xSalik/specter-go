@@ -9,24 +9,41 @@ services:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-http://localhost:8080/auth/callback}
-      DATABASE_URL: postgres://specter:specter@postgres:5432/specter?sslmode=disable
+      # DB and Lavalink hosts are wired to the compose network — do NOT change.
+      DATABASE_URL: postgres://specter:${POSTGRES_PASSWORD:-specter}@postgres:5432/specter?sslmode=disable
+      LAVALINK_ADDRESS: lavalink:2333
+      LAVALINK_SECURE: "false"
       DASHBOARD_PORT: 8080
       DASHBOARD_SESSION_SECRET: ${DASHBOARD_SESSION_SECRET}
       YTDLP_PATH: yt-dlp
-      LAVALINK_ADDRESS: lavalink:2333
       LAVALINK_PASSWORD: ${LAVALINK_PASSWORD:-youshallnotpass}
-      LAVALINK_SECURE: "false"
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEV_GUILD_ID: ${DEV_GUILD_ID:-}
+      GUILD_JOIN_LOG_CHANNEL_ID: ${GUILD_JOIN_LOG_CHANNEL_ID:-}
     depends_on:
       postgres:
         condition: service_healthy
       lavalink:
         condition: service_started
 
+  # One-shot: the Lavalink image runs as non-root (UID 322) and auto-downloads
+  # plugins into /opt/Lavalink/plugins, but a fresh named volume is root-owned.
+  # Fix the ownership once so the main container can write its plugin jars.
+  lavalink-init:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    user: root
+    entrypoint: ["sh", "-c", "mkdir -p /opt/Lavalink/plugins && chown -R 322:322 /opt/Lavalink/plugins"]
+    volumes:
+      - lavalink_plugins:/opt/Lavalink/plugins
+    restart: "no"
+
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4
     restart: unless-stopped
+    depends_on:
+      lavalink-init:
+        condition: service_completed_successfully
     environment:
       _JAVA_OPTIONS: -Xmx1G
       SERVER_PORT: "2333"
@@ -37,25 +54,29 @@ services:
     volumes:
       - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
       - lavalink_plugins:/opt/Lavalink/plugins
+    # Bound to localhost only: reachable for local `go run` / debugging, never
+    # exposed publicly. Remove this block entirely for a pure container deploy.
     ports:
-      - "2333:2333" # exposed so you can also run the bot locally against it
+      - "127.0.0.1:2333:2333"
 
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: specter
-      POSTGRES_PASSWORD: specter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-specter}
       POSTGRES_DB: specter
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U specter"]
+      test: ["CMD-SHELL", "pg_isready -U specter -d specter"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # Bound to localhost only. Remove this block entirely for a pure container
+    # deploy where nothing on the host needs direct DB access.
     ports:
-      - "5432:5432" # Remove in production.
+      - "127.0.0.1:5432:5432"
 
 volumes:
   pgdata:

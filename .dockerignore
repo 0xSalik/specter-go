@@ -1,0 +1,28 @@
+# Keep the build context small and never ship secrets/local state into images.
+.git
+.gitignore
+.env
+.env.*
+*.env.local
+test.env.local
+
+# Local tooling / editor state
+.vscode
+.idea
+.cursor
+
+# Build artifacts
+specter
+/bin
+dist
+
+# Docs and CI that aren't needed at build time
+README.md
+LICENSE
+docker-compose.yml
+.dockerignore
+Dockerfile
+
+# Test caches
+*.test
+coverage.out
