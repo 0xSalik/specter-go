@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/salik/specter/internal/db"
+	"github.com/0xSalik/specter/internal/db"
 )
 
 // Session mirrors a row of the sessions table (dashboard auth).

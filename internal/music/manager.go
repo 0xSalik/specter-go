@@ -3,6 +3,7 @@ package music
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -50,15 +51,27 @@ func (m *Manager) Play(guildID, voiceChannelID string, track Track) (*Player, er
 	p := m.getOrCreate(guildID)
 
 	p.mu.Lock()
-	if p.vc == nil || !p.vc.Ready {
-		vc, err := m.session.ChannelVoiceJoin(guildID, voiceChannelID, false, true)
+	needJoin := p.vc == nil || p.vc.Status != discordgo.VoiceConnectionStatusReady
+	p.mu.Unlock()
+
+	if needJoin {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		vc, err := m.session.ChannelVoiceJoin(ctx, guildID, voiceChannelID, false, true)
 		if err != nil {
-			p.mu.Unlock()
 			return nil, err
 		}
+		// Discord enforces the DAVE (E2EE) handshake on voice; wait for it to
+		// complete before streaming so frames are not dropped pre-encryption.
+		if err := vc.WaitForDAVEReady(ctx); err != nil {
+			_ = vc.Disconnect(context.Background())
+			return nil, err
+		}
+		p.mu.Lock()
 		p.vc = vc
+		p.mu.Unlock()
 	}
-	p.mu.Unlock()
 
 	p.queue.Enqueue(track)
 
@@ -87,14 +100,16 @@ func (m *Manager) Leave(guildID string) error {
 	p.vc = nil
 	p.mu.Unlock()
 	if vc != nil {
-		_ = vc.Disconnect()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_ = vc.Disconnect(ctx)
+		cancel()
 	}
 	m.players.Delete(guildID)
 	return nil
 }
 
 // Shutdown stops all players and disconnects every voice connection.
-func (m *Manager) Shutdown(_ context.Context) {
+func (m *Manager) Shutdown(ctx context.Context) {
 	m.players.Range(func(key, value any) bool {
 		p := value.(*Player)
 		p.Stop()
@@ -103,7 +118,7 @@ func (m *Manager) Shutdown(_ context.Context) {
 		p.vc = nil
 		p.mu.Unlock()
 		if vc != nil {
-			_ = vc.Disconnect()
+			_ = vc.Disconnect(ctx)
 		}
 		return true
 	})

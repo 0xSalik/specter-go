@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/salik/specter/internal/db/queries"
-	"github.com/salik/specter/internal/modlog"
+	"github.com/0xSalik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/modlog"
 )
 
 func ptr(s string) *string { return &s }

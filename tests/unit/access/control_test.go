@@ -6,8 +6,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/salik/specter/internal/access"
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/access"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 func TestAdministratorAlwaysPasses(t *testing.T) {

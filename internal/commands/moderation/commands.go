@@ -3,7 +3,7 @@ package moderation
 import (
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/core"
 )
 
 func optUser(required bool) *discordgo.ApplicationCommandOption {

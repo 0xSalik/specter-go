@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 type ctxKey string

@@ -10,10 +10,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
-	"github.com/salik/specter/internal/db"
-	"github.com/salik/specter/internal/discordutil"
-	levelsvc "github.com/salik/specter/internal/levels"
+	"github.com/0xSalik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/db"
+	"github.com/0xSalik/specter/internal/discordutil"
+	levelsvc "github.com/0xSalik/specter/internal/levels"
 )
 
 const group = "levels"

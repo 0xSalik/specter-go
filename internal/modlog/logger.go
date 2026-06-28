@@ -13,9 +13,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
 
-	"github.com/salik/specter/internal/db"
-	"github.com/salik/specter/internal/db/queries"
-	"github.com/salik/specter/internal/embed"
+	"github.com/0xSalik/specter/internal/db"
+	"github.com/0xSalik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/embed"
 )
 
 // Event type constants used for routing and override lookups.
@@ -44,6 +44,7 @@ type ModLogEvent struct {
 	TargetID   string
 	TargetName string
 	Reason     string
+	Thumbnail  string
 	Extra      map[string]string
 	Timestamp  time.Time
 }
@@ -127,6 +128,12 @@ func (l *Logger) Log(s *discordgo.Session, ev ModLogEvent) {
 		Title(titleFor(ev.EventType)).
 		Timestamp()
 
+	if ev.Thumbnail != "" {
+		b.Thumbnail(ev.Thumbnail)
+	}
+	if ev.TargetID != "" {
+		b.Footer("User ID: " + ev.TargetID)
+	}
 	if ev.TargetName != "" || ev.TargetID != "" {
 		b.Field("Target", display(ev.TargetName, ev.TargetID), true)
 	}

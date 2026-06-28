@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/salik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/core"
 )
 
 // discordFileLimit is the default non-boosted upload limit (25 MB).

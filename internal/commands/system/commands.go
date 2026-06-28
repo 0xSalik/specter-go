@@ -9,9 +9,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
-	"github.com/salik/specter/internal/discordutil"
-	"github.com/salik/specter/internal/httpx"
+	"github.com/0xSalik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/discordutil"
+	"github.com/0xSalik/specter/internal/httpx"
 )
 
 const group = "system"
@@ -45,7 +45,7 @@ func handleAFK(c *core.Context) {
 		_ = c.Errorf("Failed to set your AFK status.", err)
 		return
 	}
-	_ = c.ReplyEphemeral(c.Embed().Title("AFK Set").Description("You are now AFK: "+reason).AsSuccess().Build())
+	_ = c.ReplyEphemeral(c.Embed().Title("AFK Set").Description("You are now AFK: " + reason).AsSuccess().Build())
 }
 
 func handleTranslate(c *core.Context) {

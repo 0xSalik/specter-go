@@ -4,7 +4,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
 
-	"github.com/salik/specter/internal/embed"
+	"github.com/0xSalik/specter/internal/embed"
 )
 
 // Context carries everything a handler needs for a single interaction.
@@ -29,23 +29,34 @@ func newContext(d *Deps, i *discordgo.InteractionCreate) *Context {
 		c.UserID = i.User.ID
 	}
 
-	data := i.ApplicationCommandData()
-	c.options = data.Options
-	if len(data.Options) > 0 {
-		switch data.Options[0].Type {
-		case discordgo.ApplicationCommandOptionSubCommand:
-			c.SubCommand = data.Options[0].Name
-			c.options = data.Options[0].Options
-		case discordgo.ApplicationCommandOptionSubCommandGroup:
-			grp := data.Options[0]
-			if len(grp.Options) > 0 {
-				c.SubCommand = grp.Name + " " + grp.Options[0].Name
-				c.options = grp.Options[0].Options
+	// Option parsing only applies to application-command interactions. Calling
+	// ApplicationCommandData on a component or modal interaction panics, so it
+	// must be guarded by the interaction type.
+	if i.Type == discordgo.InteractionApplicationCommand {
+		data := i.ApplicationCommandData()
+		c.options = data.Options
+		if len(data.Options) > 0 {
+			switch data.Options[0].Type {
+			case discordgo.ApplicationCommandOptionSubCommand:
+				c.SubCommand = data.Options[0].Name
+				c.options = data.Options[0].Options
+			case discordgo.ApplicationCommandOptionSubCommandGroup:
+				grp := data.Options[0]
+				if len(grp.Options) > 0 {
+					c.SubCommand = grp.Name + " " + grp.Options[0].Name
+					c.options = grp.Options[0].Options
+				}
 			}
 		}
 	}
 	return c
 }
+
+// NewContextForTest exposes newContext to tests.
+func NewContextForTest(d *Deps, i *discordgo.InteractionCreate) *Context { return newContext(d, i) }
+
+// Options exposes the flattened option slice (for tests).
+func (c *Context) Options() []*discordgo.ApplicationCommandInteractionDataOption { return c.options }
 
 // Embed returns a fresh builder pre-set to the guild's accent color.
 func (c *Context) Embed() *embed.EmbedBuilder {
@@ -190,8 +201,13 @@ func (c *Context) Success(title, desc string) error {
 // Errorf replies with a red error embed and logs the underlying cause.
 func (c *Context) Errorf(userMsg string, cause error) error {
 	if cause != nil {
-		log.Error().Err(cause).Str("guild", c.GuildID).Str("user", c.UserID).
-			Str("command", c.Interaction.ApplicationCommandData().Name).Msg(userMsg)
+		ev := log.Error().Err(cause).Str("guild", c.GuildID).Str("user", c.UserID)
+		// ApplicationCommandData panics for component/modal interactions, so the
+		// command name is only logged for actual command interactions.
+		if c.Interaction != nil && c.Interaction.Type == discordgo.InteractionApplicationCommand {
+			ev = ev.Str("command", c.Interaction.ApplicationCommandData().Name)
+		}
+		ev.Msg(userMsg)
 	}
 	e := c.Embed().Title("Error").Description(userMsg).AsError().Build()
 	if c.deferred {

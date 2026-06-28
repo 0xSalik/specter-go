@@ -5,7 +5,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/core"
 )
 
 func resolveChannel(c *core.Context) (*discordgo.Channel, error) {

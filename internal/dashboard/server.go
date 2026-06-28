@@ -18,8 +18,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 
-	"github.com/salik/specter/internal/config"
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/config"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 //go:embed templates/*.html

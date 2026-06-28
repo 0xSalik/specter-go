@@ -10,29 +10,30 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
 
-	"github.com/salik/specter/internal/access"
-	"github.com/salik/specter/internal/automod"
-	"github.com/salik/specter/internal/config"
-	"github.com/salik/specter/internal/core"
-	"github.com/salik/specter/internal/dashboard"
-	"github.com/salik/specter/internal/db/queries"
-	"github.com/salik/specter/internal/embed"
-	"github.com/salik/specter/internal/events"
-	"github.com/salik/specter/internal/levels"
-	"github.com/salik/specter/internal/modlog"
-	"github.com/salik/specter/internal/music"
-	"github.com/salik/specter/internal/reactionroles"
-	"github.com/salik/specter/internal/voice"
+	"github.com/0xSalik/specter/internal/access"
+	"github.com/0xSalik/specter/internal/automod"
+	"github.com/0xSalik/specter/internal/config"
+	"github.com/0xSalik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/dashboard"
+	"github.com/0xSalik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/embed"
+	"github.com/0xSalik/specter/internal/events"
+	"github.com/0xSalik/specter/internal/invites"
+	"github.com/0xSalik/specter/internal/levels"
+	"github.com/0xSalik/specter/internal/modlog"
+	"github.com/0xSalik/specter/internal/music"
+	"github.com/0xSalik/specter/internal/reactionroles"
+	"github.com/0xSalik/specter/internal/voice"
 
-	cmdfun "github.com/salik/specter/internal/commands/fun"
-	cmdlevels "github.com/salik/specter/internal/commands/levels"
-	cmdmod "github.com/salik/specter/internal/commands/moderation"
-	cmdmusic "github.com/salik/specter/internal/commands/music"
-	cmdrr "github.com/salik/specter/internal/commands/reactionroles"
-	cmdsystem "github.com/salik/specter/internal/commands/system"
-	cmduser "github.com/salik/specter/internal/commands/user"
-	cmdutils "github.com/salik/specter/internal/commands/utils"
-	cmdvoice "github.com/salik/specter/internal/commands/voice"
+	cmdfun "github.com/0xSalik/specter/internal/commands/fun"
+	cmdlevels "github.com/0xSalik/specter/internal/commands/levels"
+	cmdmod "github.com/0xSalik/specter/internal/commands/moderation"
+	cmdmusic "github.com/0xSalik/specter/internal/commands/music"
+	cmdrr "github.com/0xSalik/specter/internal/commands/reactionroles"
+	cmdsystem "github.com/0xSalik/specter/internal/commands/system"
+	cmduser "github.com/0xSalik/specter/internal/commands/user"
+	cmdutils "github.com/0xSalik/specter/internal/commands/utils"
+	cmdvoice "github.com/0xSalik/specter/internal/commands/voice"
 )
 
 // Bot is the top-level application.
@@ -56,6 +57,7 @@ func New(cfg *config.Config, store *queries.Store) (*Bot, error) {
 		discordgo.IntentsGuildMessages |
 		discordgo.IntentsGuildVoiceStates |
 		discordgo.IntentsGuildMessageReactions |
+		discordgo.IntentsGuildInvites |
 		discordgo.IntentMessageContent |
 		discordgo.IntentsDirectMessages
 
@@ -72,6 +74,7 @@ func New(cfg *config.Config, store *queries.Store) (*Bot, error) {
 		Automod:       automod.NewChecker(),
 		ReactionRoles: reactionroles.New(store),
 		JTC:           voice.New(store),
+		Invites:       invites.New(),
 		Config:        cfg,
 	}
 

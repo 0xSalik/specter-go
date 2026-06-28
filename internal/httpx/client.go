@@ -11,7 +11,7 @@ import (
 )
 
 // UserAgent identifies the bot to external APIs.
-const UserAgent = "Specter/1.0 (+https://github.com/salik/specter)"
+const UserAgent = "Specter/1.0 (+https://github.com/0xSalik/specter)"
 
 // GetJSON fetches url and decodes the JSON body into out.
 func GetJSON(ctx context.Context, url string, out any) error {

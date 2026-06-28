@@ -7,7 +7,7 @@ import (
 
 	"github.com/fogleman/gg"
 
-	"github.com/salik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/core"
 )
 
 func handleTweet(c *core.Context) {

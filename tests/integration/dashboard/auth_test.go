@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/salik/specter/internal/config"
-	"github.com/salik/specter/internal/dashboard"
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/config"
+	"github.com/0xSalik/specter/internal/dashboard"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 func newTestServer(t *testing.T) http.Handler {

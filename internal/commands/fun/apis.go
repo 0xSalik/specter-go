@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/salik/specter/internal/core"
-	"github.com/salik/specter/internal/httpx"
+	"github.com/0xSalik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/httpx"
 )
 
 func apiCtx() (context.Context, context.CancelFunc) {
@@ -119,9 +119,9 @@ func handleMeme(c *core.Context) {
 		Data struct {
 			Children []struct {
 				Data struct {
-					Title string `json:"title"`
-					URL   string `json:"url"`
-					Over18 bool  `json:"over_18"`
+					Title  string `json:"title"`
+					URL    string `json:"url"`
+					Over18 bool   `json:"over_18"`
 				} `json:"data"`
 			} `json:"children"`
 		} `json:"data"`
@@ -146,8 +146,8 @@ func handleWiki(c *core.Context) {
 
 	endpoint := "https://en.wikipedia.org/api/rest_v1/page/summary/" + url.PathEscape(query)
 	var resp struct {
-		Title   string `json:"title"`
-		Extract string `json:"extract"`
+		Title       string `json:"title"`
+		Extract     string `json:"extract"`
 		ContentURLs struct {
 			Desktop struct {
 				Page string `json:"page"`

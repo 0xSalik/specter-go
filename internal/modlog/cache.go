@@ -9,14 +9,27 @@ import (
 // maxPerChannel bounds the message cache size per channel to limit memory.
 const maxPerChannel = 1000
 
-// CachedMessage stores the minimal content needed to enrich delete/edit logs.
+// CachedAttachment records the details of a message attachment so it can still
+// be reported after the original message (and its live CDN link) is gone.
+type CachedAttachment struct {
+	Filename string
+	URL      string
+	ProxyURL string
+	Size     int
+}
+
+// CachedMessage stores the content needed to enrich delete/edit logs, including
+// attachments and embed count so embed-only / attachment-only messages are not
+// reported as empty.
 type CachedMessage struct {
-	ID        string
-	ChannelID string
-	GuildID   string
-	AuthorID  string
-	Author    string
-	Content   string
+	ID          string
+	ChannelID   string
+	GuildID     string
+	AuthorID    string
+	Author      string
+	Content     string
+	Attachments []CachedAttachment
+	EmbedCount  int
 }
 
 // MessageCache is a bounded, concurrency-safe per-channel ring of recent
@@ -48,9 +61,24 @@ func (c *MessageCache) Put(m *discordgo.Message) {
 		author = m.Author.Username
 		authorID = m.Author.ID
 	}
+
+	var attachments []CachedAttachment
+	for _, a := range m.Attachments {
+		if a == nil {
+			continue
+		}
+		attachments = append(attachments, CachedAttachment{
+			Filename: a.Filename,
+			URL:      a.URL,
+			ProxyURL: a.ProxyURL,
+			Size:     a.Size,
+		})
+	}
+
 	c.byID[m.ID] = &CachedMessage{
 		ID: m.ID, ChannelID: m.ChannelID, GuildID: m.GuildID,
 		AuthorID: authorID, Author: author, Content: m.Content,
+		Attachments: attachments, EmbedCount: len(m.Embeds),
 	}
 	order := append(c.order[m.ChannelID], m.ID)
 	if len(order) > maxPerChannel {

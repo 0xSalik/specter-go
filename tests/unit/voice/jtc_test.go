@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/salik/specter/internal/voice"
+	"github.com/0xSalik/specter/internal/voice"
 )
 
 func TestRenderNameUsername(t *testing.T) {

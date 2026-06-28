@@ -21,6 +21,7 @@ type Config struct {
 	LogLevel              string
 	Environment           string
 	DevGuildID            string // optional: register commands to this guild for instant updates
+	GuildJoinLogChannelID string // optional: channel where bot server joins/leaves are logged
 }
 
 // Load reads configuration from the environment and an optional .env file.
@@ -44,17 +45,18 @@ func Load() (*Config, error) {
 	v.SetDefault("ENVIRONMENT", "production")
 
 	cfg := &Config{
-		DiscordToken:        v.GetString("DISCORD_TOKEN"),
-		DiscordClientID:     v.GetString("DISCORD_CLIENT_ID"),
-		DiscordClientSecret: v.GetString("DISCORD_CLIENT_SECRET"),
-		DiscordRedirectURI:  v.GetString("DISCORD_REDIRECT_URI"),
-		DatabaseURL:         v.GetString("DATABASE_URL"),
-		DashboardPort:       v.GetInt("DASHBOARD_PORT"),
-		DashboardSessionKey: v.GetString("DASHBOARD_SESSION_SECRET"),
-		YTDLPPath:           v.GetString("YTDLP_PATH"),
-		LogLevel:            v.GetString("LOG_LEVEL"),
-		Environment:         v.GetString("ENVIRONMENT"),
-		DevGuildID:          v.GetString("DEV_GUILD_ID"),
+		DiscordToken:          v.GetString("DISCORD_TOKEN"),
+		DiscordClientID:       v.GetString("DISCORD_CLIENT_ID"),
+		DiscordClientSecret:   v.GetString("DISCORD_CLIENT_SECRET"),
+		DiscordRedirectURI:    v.GetString("DISCORD_REDIRECT_URI"),
+		DatabaseURL:           v.GetString("DATABASE_URL"),
+		DashboardPort:         v.GetInt("DASHBOARD_PORT"),
+		DashboardSessionKey:   v.GetString("DASHBOARD_SESSION_SECRET"),
+		YTDLPPath:             v.GetString("YTDLP_PATH"),
+		LogLevel:              v.GetString("LOG_LEVEL"),
+		Environment:           v.GetString("ENVIRONMENT"),
+		DevGuildID:            v.GetString("DEV_GUILD_ID"),
+		GuildJoinLogChannelID: v.GetString("GUILD_JOIN_LOG_CHANNEL_ID"),
 	}
 
 	if err := cfg.validate(); err != nil {

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/salik/specter/tests/integration/testdb"
+	"github.com/0xSalik/specter/tests/integration/testdb"
 )
 
 func TestLevelRankSingleUser(t *testing.T) {

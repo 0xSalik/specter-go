@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/salik/specter/internal/automod"
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/automod"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 func TestAntiInvite(t *testing.T) {

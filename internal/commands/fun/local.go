@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/salik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/core"
 )
 
 func handleFlip(c *core.Context) {

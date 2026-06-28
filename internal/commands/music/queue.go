@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/salik/specter/internal/core"
-	musicsvc "github.com/salik/specter/internal/music"
+	"github.com/0xSalik/specter/internal/core"
+	musicsvc "github.com/0xSalik/specter/internal/music"
 )
 
 func handleQueue(c *core.Context) {

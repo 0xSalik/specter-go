@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/salik/specter/internal/music"
+	"github.com/0xSalik/specter/internal/music"
 )
 
 func TestQueueFIFO(t *testing.T) {

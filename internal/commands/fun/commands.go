@@ -5,7 +5,7 @@ package fun
 import (
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/core"
 )
 
 const group = "fun"

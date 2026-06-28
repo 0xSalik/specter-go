@@ -9,9 +9,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
-	"github.com/salik/specter/internal/embed"
-	"github.com/salik/specter/internal/guildsetup"
+	"github.com/0xSalik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/embed"
+	"github.com/0xSalik/specter/internal/guildsetup"
 )
 
 const group = "system"
@@ -82,7 +82,7 @@ func setupColor(c *core.Context) {
 		return
 	}
 	embed.Invalidate(c.GuildID)
-	_ = c.Reply(c.Embed().Title("Color Updated").Description("Embed accent color set to "+hex+".").AsSuccess().Build())
+	_ = c.Reply(c.Embed().Title("Color Updated").Description("Embed accent color set to " + hex + ".").AsSuccess().Build())
 }
 
 func setupModlogs(c *core.Context) {

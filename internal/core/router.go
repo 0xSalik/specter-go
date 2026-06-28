@@ -66,8 +66,20 @@ func (r *Router) Definitions() []*discordgo.ApplicationCommand {
 }
 
 // Handle is the discordgo InteractionCreate callback. It routes both
-// application commands and message components.
+// application commands and message components. A top-level recover guarantees
+// that no panic in routing or any handler can ever crash the bot process
+// (discordgo dispatches each event in its own goroutine, so an unrecovered
+// panic would otherwise terminate the program).
 func (r *Router) Handle(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Error().Interface("panic", rec).
+				Str("interaction_type", i.Type.String()).
+				Str("guild", i.GuildID).
+				Msg("recovered from panic in interaction handler")
+		}
+	}()
+
 	switch i.Type {
 	case discordgo.InteractionApplicationCommand:
 		r.handleCommand(i)
@@ -109,7 +121,9 @@ func (r *Router) handleComponent(i *discordgo.InteractionCreate) {
 
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Error().Interface("panic", rec).Str("custom_id", customID).Msg("recovered from component panic")
+			log.Error().Interface("panic", rec).Str("custom_id", customID).
+				Str("guild", c.GuildID).Str("user", c.UserID).Msg("recovered from component panic")
+			_ = c.Errorf("An unexpected error occurred while handling that interaction.", nil)
 		}
 	}()
 

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 // Violation describes a triggered rule and the action that should be taken.

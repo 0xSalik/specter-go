@@ -11,10 +11,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/salik/specter/internal/bot"
-	"github.com/salik/specter/internal/config"
-	"github.com/salik/specter/internal/db"
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/bot"
+	"github.com/0xSalik/specter/internal/config"
+	"github.com/0xSalik/specter/internal/db"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 // version is overridden at build time via -ldflags.

@@ -10,7 +10,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 type pageData struct {

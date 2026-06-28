@@ -5,7 +5,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/modlog"
+	"github.com/0xSalik/specter/internal/modlog"
 )
 
 func (h *Handlers) onChannelCreate(s *discordgo.Session, c *discordgo.ChannelCreate) {

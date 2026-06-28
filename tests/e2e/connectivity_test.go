@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/salik/specter/tests/e2e/harness"
+	"github.com/0xSalik/specter/tests/e2e/harness"
 )
 
 // TestConnectivity verifies the test bot can connect and observe its own

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/salik/specter/internal/db"
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/db"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 var allTables = []string{

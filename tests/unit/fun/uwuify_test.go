@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	fun "github.com/salik/specter/internal/commands/fun"
+	fun "github.com/0xSalik/specter/internal/commands/fun"
 )
 
 func TestUwuifyReplacesR(t *testing.T) {

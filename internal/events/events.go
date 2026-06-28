@@ -5,7 +5,7 @@ package events
 import (
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/core"
 )
 
 // Handlers bundles the dependency container for event callbacks.
@@ -32,6 +32,8 @@ func Register(s *discordgo.Session, deps *core.Deps) *Handlers {
 	s.AddHandler(h.onReactionAdd)
 	s.AddHandler(h.onReactionRemove)
 	s.AddHandler(h.onVoiceStateUpdate)
+	s.AddHandler(h.onInviteCreate)
+	s.AddHandler(h.onInviteDelete)
 
 	return h
 }

@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/salik/specter/internal/db"
+	"github.com/0xSalik/specter/internal/db"
 )
 
 // JTCConfig mirrors a row of jtc_config.

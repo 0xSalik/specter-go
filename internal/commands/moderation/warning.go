@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/salik/specter/internal/core"
-	"github.com/salik/specter/internal/modlog"
+	"github.com/0xSalik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/modlog"
 )
 
 func handleWarning(c *core.Context) {

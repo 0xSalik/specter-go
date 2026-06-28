@@ -8,9 +8,9 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"github.com/salik/specter/internal/core"
-	"github.com/salik/specter/internal/db"
-	rrsvc "github.com/salik/specter/internal/reactionroles"
+	"github.com/0xSalik/specter/internal/core"
+	"github.com/0xSalik/specter/internal/db"
+	rrsvc "github.com/0xSalik/specter/internal/reactionroles"
 )
 
 const group = "reactionroles"

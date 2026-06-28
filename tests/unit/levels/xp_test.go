@@ -7,15 +7,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/salik/specter/internal/levels"
+	"github.com/0xSalik/specter/internal/levels"
 )
 
 func TestLevelForXP(t *testing.T) {
 	assert.Equal(t, 0, levels.LevelForXP(0))
 	assert.Equal(t, 0, levels.LevelForXP(50))
-	assert.Equal(t, 1, levels.LevelForXP(100))  // 0.1*sqrt(100)=1
-	assert.Equal(t, 2, levels.LevelForXP(400))  // 0.1*sqrt(400)=2
-	assert.Equal(t, 3, levels.LevelForXP(900))  // 0.1*sqrt(900)=3
+	assert.Equal(t, 1, levels.LevelForXP(100)) // 0.1*sqrt(100)=1
+	assert.Equal(t, 2, levels.LevelForXP(400)) // 0.1*sqrt(400)=2
+	assert.Equal(t, 3, levels.LevelForXP(900)) // 0.1*sqrt(900)=3
 	assert.Equal(t, 10, levels.LevelForXP(10000))
 }
 

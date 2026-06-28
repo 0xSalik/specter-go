@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/salik/specter/internal/db/queries"
+	"github.com/0xSalik/specter/internal/db/queries"
 )
 
 const sessionCookie = "specter_session"
